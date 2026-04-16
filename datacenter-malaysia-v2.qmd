@@ -1,6 +1,6 @@
 ---
-title: "Building a Global Datacenter Dataset: Malaysia Pilot (v2)"
-author: "Daniel"
+title: "Building a Global Datacenter Dataset: Malaysia Pilot (v4)"
+author: "Daniel Kento Chavez"
 date: today
 format:
   pdf:
@@ -58,7 +58,7 @@ operations, and mapping.
 #| warning: false
 
 Sys.setenv(RETICULATE_PYTHON = "/opt/anaconda3/envs/textmining/bin/python")
-
+Sys.setenv(GOOGLE_API_KEY = "AIzaSyCtKec4kSpO6Ew3eTq2AFsNGCZA0J9hSBk")
 library(reticulate)
 use_condaenv("textmining", required = TRUE)
 
@@ -245,6 +245,34 @@ osm_df <- tibble(
 
 cat("Parsed", nrow(osm_df), "datacenter facilities from OSM\n\n")
 kable(head(osm_df, 10), caption = "First 10 datacenters from OpenStreetMap")
+```
+
+
+```{r}
+#| label: filter-commercial
+
+non_dc_keywords <- c(
+  "server room", "war gaming", "simulation center",
+  "campus server", "university", "lab ", "laboratory",
+  "classroom", "training room"
+)
+
+osm_df <- osm_df %>%
+  mutate(
+    likely_commercial = !str_detect(
+      tolower(name),
+      paste(non_dc_keywords, collapse = "|")
+    )
+  )
+
+excluded <- osm_df %>% filter(!likely_commercial)
+osm_df  <- osm_df %>% filter(likely_commercial)
+
+cat("Removed", nrow(excluded), "non-commercial entries:\n")
+if (nrow(excluded) > 0) {
+  cat(paste(" -", excluded$name, collapse = "\n"), "\n")
+}
+cat("Remaining OSM facilities:", nrow(osm_df), "\n")
 ```
 
 # Part 3: Query Wikidata via SPARQL
@@ -512,14 +540,15 @@ cloud_df <- bind_rows(aws_my, other_clouds) %>%
     operator    = provider,
     wikidata_id = NA_character_,
     osm_id      = NA_character_,
-    osm_type    = NA_character_
+    osm_type    = NA_character_,
+    facility_type = "cloud_region"
   ) %>%
   select(name, operator, lat, lon, source, osm_id, osm_type, wikidata_id,
-         provider, region_code, note)
+         provider, region_code, note, facility_type)
 
 cat("Total cloud regions:", nrow(cloud_df), "\n")
-kable(cloud_df %>% select(name, provider, region_code, source),
-      caption = "All cloud regions combined")
+kable(cloud_df %>% select(name, provider, region_code, facility_type),
+      caption = "All cloud regions combined (typed as cloud_region)")
 ```
 
 # Part 5: Merge and Deduplicate
@@ -538,27 +567,29 @@ where not applicable.
 
 osm_slim <- osm_df %>%
   mutate(
-    osm_id      = as.character(osm_id),
-    osm_type    = as.character(osm_type),
-    wikidata_id = NA_character_,
-    provider    = NA_character_,
-    region_code = NA_character_,
-    note        = NA_character_
+    osm_id        = as.character(osm_id),
+    osm_type      = as.character(osm_type),
+    wikidata_id   = NA_character_,
+    provider      = NA_character_,
+    region_code   = NA_character_,
+    note          = NA_character_,
+    facility_type = "physical_facility"
   ) %>%
   select(name, operator, lat, lon, source, osm_id, osm_type,
-         wikidata_id, provider, region_code, note)
+         wikidata_id, provider, region_code, note, facility_type)
 
 wd_slim <- wd_df %>%
   mutate(
-    osm_id      = NA_character_,
-    osm_type    = NA_character_,
-    wikidata_id = as.character(wikidata_id),
-    provider    = NA_character_,
-    region_code = NA_character_,
-    note        = NA_character_
+    osm_id        = NA_character_,
+    osm_type      = NA_character_,
+    wikidata_id   = as.character(wikidata_id),
+    provider      = NA_character_,
+    region_code   = NA_character_,
+    note          = NA_character_,
+    facility_type = "physical_facility"
   ) %>%
   select(name, operator, lat, lon, source, osm_id, osm_type,
-         wikidata_id, provider, region_code, note)
+         wikidata_id, provider, region_code, note, facility_type)
 
 cloud_slim <- cloud_df %>%
   mutate(
@@ -567,7 +598,7 @@ cloud_slim <- cloud_df %>%
     wikidata_id = as.character(wikidata_id)
   ) %>%
   select(name, operator, lat, lon, source, osm_id, osm_type,
-         wikidata_id, provider, region_code, note)
+         wikidata_id, provider, region_code, note, facility_type)
 
 combined <- bind_rows(osm_slim, wd_slim, cloud_slim)
 
@@ -576,6 +607,10 @@ cat("  OSM:", sum(combined$source == "OpenStreetMap"), "\n")
 cat("  Wikidata:", sum(combined$source == "Wikidata"), "\n")
 cat("  Cloud providers:",
     sum(grepl("Cloud Provider", combined$source)), "\n")
+cat("  Physical facilities:",
+    sum(combined$facility_type == "physical_facility"), "\n")
+cat("  Cloud regions:",
+    sum(combined$facility_type == "cloud_region"), "\n")
 ```
 
 ## Deduplicate by spatial proximity
@@ -616,15 +651,16 @@ deduped <- combined %>%
       non_na_ops <- operator[!is.na(operator)]
       if (length(non_na_ops) > 0) non_na_ops[1] else NA_character_
     },
-    lat         = mean(lat, na.rm = TRUE),
-    lon         = mean(lon, na.rm = TRUE),
-    sources     = paste(unique(source), collapse = "; "),
-    osm_id      = paste(na.omit(unique(osm_id)), collapse = "; "),
-    wikidata_id = paste(na.omit(unique(wikidata_id)), collapse = "; "),
-    provider    = paste(na.omit(unique(provider)), collapse = "; "),
-    region_code = paste(na.omit(unique(region_code)), collapse = "; "),
-    n_sources   = n_distinct(source),
-    .groups     = "drop"
+    lat           = mean(lat, na.rm = TRUE),
+    lon           = mean(lon, na.rm = TRUE),
+    sources       = paste(unique(source), collapse = "; "),
+    osm_id        = paste(na.omit(unique(osm_id)), collapse = "; "),
+    wikidata_id   = paste(na.omit(unique(wikidata_id)), collapse = "; "),
+    provider      = paste(na.omit(unique(provider)), collapse = "; "),
+    region_code   = paste(na.omit(unique(region_code)), collapse = "; "),
+    facility_type = first(facility_type),
+    n_sources     = n_distinct(source),
+    .groups       = "drop"
   ) %>%
   select(-lat_key, -lon_key, -cloud_group) %>%
   arrange(desc(n_sources), name)
@@ -1145,7 +1181,17 @@ provider regions in Part 4, with the same caveats about precision.
 ```{r}
 #| label: curated-trade-press
 
-trade_press_facilities <- tibble(
+library(ggmap)
+
+if (Sys.getenv("GOOGLE_API_KEY") != "") {
+  register_google(key = Sys.getenv("GOOGLE_API_KEY"))
+  has_geocoder <- TRUE
+} else {
+  has_geocoder <- FALSE
+  cat("No Google API key found; using city-level fallback coordinates\n")
+}
+
+trade_press_raw <- tibble(
   name = c(
     "Bridge Data Centres MY02 (Cyberjaya)",
     "Bridge Data Centres (Johor)",
@@ -1191,41 +1237,32 @@ trade_press_facilities <- tibble(
     "Bytedance",
     "Google"
   ),
-  lat = c(
-    2.920, 1.695,
-    3.140, 2.925,
-    1.500, 2.930,
-    1.700,
-    2.930, 1.520, 1.510,
-    6.530,
-    1.698, 1.700,
-    2.925, 1.705,
-    1.690,
-    2.928, 1.692, 3.060,
-    1.695,
-    1.703,
-    5.330,
-    1.480,
-    1.693,
-    3.100
-  ),
-  lon = c(
-    101.655, 103.420,
-    101.690, 101.660,
-    103.750, 101.658,
-    103.410,
-    101.660, 103.640, 103.630,
-    100.430,
-    103.412, 103.415,
-    101.662, 103.418,
-    103.410,
-    101.658, 103.410, 101.680,
-    103.415,
-    103.413,
-    100.270,
-    103.700,
-    103.418,
-    101.580
+  geocode_query = c(
+    "Bridge Data Centres MY02 Cyberjaya Malaysia",
+    "Bridge Data Centres Johor Bahru Malaysia",
+    "Bangunan AIMS data center Kuala Lumpur Malaysia",
+    "AIMS data center Cyberjaya Malaysia",
+    "NTT data center Gelang Patah Johor Bahru Malaysia",
+    "NTT data center Cyberjaya Malaysia",
+    "YTL Green Data Center Park Kulai Johor Malaysia",
+    "Telekom Malaysia KVDC Cyberjaya Malaysia",
+    "Telekom Malaysia IPDC Iskandar Puteri Malaysia",
+    "TM Nxera data center Iskandar Puteri Johor Malaysia",
+    "Area Group data center Kedah Malaysia Delapan",
+    "AirTrunk JHB1 data center Johor Bahru Malaysia",
+    "AirTrunk JHB2 data center Johor Malaysia",
+    "Vantage data center Cyberjaya Malaysia",
+    "Yondr data center Sedenak Johor Malaysia",
+    "DayOne data center Nusajaya Johor Malaysia",
+    "EdgeConneX data center Cyberjaya Malaysia",
+    "EdgeConneX data center Johor Bahru Malaysia",
+    "EdgeConneX data center Bukit Jalil Kuala Lumpur Malaysia",
+    "Princeton Digital Group data center Johor Malaysia",
+    "K2 Strategic data center Sedenak Johor Malaysia",
+    "Open DC PE2 data center Bayan Lepas Penang Malaysia",
+    "Empyrion Digital data center Nusajaya Johor Malaysia",
+    "Bytedance data center Johor Malaysia",
+    "Google data center Elmina Business Park Selangor Malaysia"
   ),
   source = "Trade Press (NER extraction)",
   note = c(
@@ -1254,12 +1291,101 @@ trade_press_facilities <- tibble(
     "34.9 acres, Nusajaya, SiLC; approved Dec 2025; press release",
     "Johor presence mentioned in DCD analysis",
     "$2B investment; Elmina Business Park; TNG/MIDA"
-  )
+  ),
+  facility_type = "physical_facility"
 )
 
-cat("New facilities from trade press:", nrow(trade_press_facilities), "\n")
-kable(trade_press_facilities %>% select(name, operator, note),
-      caption = "Datacenter facilities identified via trade press NER")
+if (has_geocoder) {
+  cat("Geocoding", nrow(trade_press_raw), "facilities via Google Maps API...\n")
+
+  geocoded <- trade_press_raw %>%
+    mutate(
+      geo_result = map(geocode_query, function(q) {
+        Sys.sleep(0.5)
+        tryCatch(
+          geocode(q, output = "latlon"),
+          error = function(e) tibble(lon = NA_real_, lat = NA_real_)
+        )
+      })
+    ) %>%
+    unnest(geo_result) %>%
+    rename(lat = lat, lon = lon)
+
+  geocoded <- geocoded %>%
+    mutate(
+      in_malaysia = lat > 0.5 & lat < 7.5 & lon > 99 & lon < 120,
+      coord_confidence = case_when(
+        !is.na(lat) & in_malaysia ~ "geocoded",
+        TRUE ~ "city_approximation"
+      )
+    )
+
+  failed <- geocoded %>% filter(coord_confidence == "city_approximation")
+  if (nrow(failed) > 0) {
+    cat("Geocoding failed or returned non-Malaysia for:\n")
+    cat(paste(" -", failed$name, collapse = "\n"), "\n")
+  }
+
+  trade_press_facilities <- geocoded %>% select(-geocode_query, -in_malaysia)
+
+} else {
+  cat("Falling back to city-level approximations (no API key)\n")
+
+  trade_press_facilities <- trade_press_raw %>%
+    mutate(
+      lat = c(
+        2.920, 1.550, 3.140, 2.925, 1.500, 2.930, 1.700,
+        2.930, 1.520, 1.510, 6.530, 1.463, 1.500, 2.925,
+        1.705, 1.480, 2.928, 1.550, 3.060, 1.550, 1.703,
+        5.330, 1.480, 1.550, 3.100
+      ),
+      lon = c(
+        101.655, 103.750, 101.690, 101.660, 103.750, 101.658, 103.410,
+        101.660, 103.640, 103.630, 100.430, 103.772, 103.750, 101.662,
+        103.418, 103.700, 101.658, 103.750, 101.680, 103.750, 103.413,
+        100.270, 103.700, 103.750, 101.580
+      ),
+      coord_confidence = "city_approximation"
+    ) %>%
+    select(-geocode_query)
+}
+
+cat("Trade press facilities:", nrow(trade_press_facilities), "\n")
+cat("Geocoded:", sum(trade_press_facilities$coord_confidence == "geocoded",
+                     na.rm = TRUE), "\n")
+cat("City approximation:",
+    sum(trade_press_facilities$coord_confidence == "city_approximation",
+        na.rm = TRUE), "\n")
+```
+
+```{r}
+#| label: parse-status
+
+trade_press_facilities <- trade_press_facilities %>%
+  mutate(
+    status = case_when(
+      str_detect(note, regex("opened|launched|operations|active|operating",
+                             ignore_case = TRUE)) ~ "Operational",
+      str_detect(note, regex("construction|broke ground|underway|building",
+                             ignore_case = TRUE)) ~ "Under Construction",
+      str_detect(note, regex("announced|planned|proposed|approved|targeted",
+                             ignore_case = TRUE)) ~ "Planned",
+      str_detect(note, regex("acquired|acquisition",
+                             ignore_case = TRUE)) ~ "Under Development",
+      TRUE ~ "Unknown"
+    ),
+    year = str_extract(note, "20[0-9]{2}") %>% as.integer()
+  )
+
+status_summary <- trade_press_facilities %>%
+  count(status, sort = TRUE)
+
+cat("Status breakdown:\n")
+print(status_summary)
+
+kable(trade_press_facilities %>%
+        select(name, operator, status, year, coord_confidence),
+      caption = "Trade press facilities with status, year, and coordinate confidence")
 ```
 
 ## Merge trade press facilities into the final dataset
@@ -1274,45 +1400,139 @@ for overlap with the new entries.
 ```{r}
 #| label: merge-trade-press
 
+operator_aliases <- tribble(
+  ~alias,                  ~canonical,
+  "TMONE",                 "Telekom Malaysia",
+  "TM Global",             "Telekom Malaysia",
+  "VADS",                  "Telekom Malaysia",
+  "TM",                    "Telekom Malaysia",
+  "TM / Nxera",            "Telekom Malaysia / Nxera",
+  "Bridge Data Centers",   "Bridge Data Centres",
+  "ChinData",              "Bridge Data Centres",
+  "NTT Data",              "NTT DATA",
+  "NTT",                   "NTT DATA",
+  "Yondr",                 "Vantage / Yondr",
+  "Vantage",               "Vantage Data Centers"
+)
+
+normalize_operator <- function(op, aliases = operator_aliases) {
+  if (is.na(op)) return(NA_character_)
+  match <- aliases %>% filter(tolower(alias) == tolower(trimws(op)))
+  if (nrow(match) > 0) return(match$canonical[1])
+  return(op)
+}
+
 trade_slim <- trade_press_facilities %>%
   mutate(
-    osm_id      = NA_character_,
-    osm_type    = NA_character_,
-    wikidata_id = NA_character_,
-    provider    = NA_character_,
-    region_code = NA_character_,
-    sources     = source,
-    n_sources   = 1L,
-    ADMIN       = "Malaysia",
-    ISO_A3      = "MYS",
-    CONTINENT   = "Asia",
-    SUBREGION   = "South-Eastern Asia",
+    osm_id          = NA_character_,
+    osm_type        = NA_character_,
+    wikidata_id     = NA_character_,
+    provider        = NA_character_,
+    region_code     = NA_character_,
+    sources         = source,
+    n_sources       = 1L,
+    ADMIN           = "Malaysia",
+    ISO_A3          = "MYS",
+    CONTINENT       = "Asia",
+    SUBREGION       = "South-Eastern Asia",
     name_normalized = name,
     has_operator    = TRUE,
     in_both_sources = FALSE,
-    source_category = "Trade Press"
+    source_category = "Trade Press",
+    operator_norm   = map_chr(operator, normalize_operator)
   ) %>%
-  select(any_of(names(final_df)))
+  select(any_of(names(final_df)), status, year, coord_confidence,
+         facility_type, operator_norm)
 
-missing_cols <- setdiff(names(final_df), names(trade_slim))
-for (col in missing_cols) {
+final_df_aug <- final_df %>%
+  mutate(
+    operator_norm    = map_chr(
+      ifelse(is.na(operator), name, operator),
+      normalize_operator
+    ),
+    status           = NA_character_,
+    year             = NA_integer_,
+    coord_confidence = "source_native",
+    facility_type    = ifelse(
+      grepl("Cloud Provider", sources),
+      "cloud_region", "physical_facility"
+    )
+  )
+
+missing_in_final <- setdiff(names(trade_slim), names(final_df_aug))
+for (col in missing_in_final) {
+  final_df_aug[[col]] <- NA
+}
+missing_in_trade <- setdiff(names(final_df_aug), names(trade_slim))
+for (col in missing_in_trade) {
   trade_slim[[col]] <- NA
 }
-trade_slim <- trade_slim[, names(final_df)]
 
-final_v3 <- bind_rows(final_df, trade_slim)
+common_cols <- intersect(names(final_df_aug), names(trade_slim))
+trade_slim    <- trade_slim[, common_cols]
+final_df_aug  <- final_df_aug[, common_cols]
 
-cat("V2 facilities:", nrow(final_df), "\n")
-cat("Trade press additions:", nrow(trade_slim), "\n")
-cat("V3 total:", nrow(final_v3), "\n")
-cat("With known operator:", sum(final_v3$has_operator, na.rm = TRUE), "\n")
+pre_merge <- bind_rows(final_df_aug, trade_slim)
+
+cat("Pre-dedup total:", nrow(pre_merge), "\n")
+
+known_dupes <- tribble(
+  ~name_a,                              ~name_b,
+  "AIMS",                               "AIMS Cyberjaya Block 2",
+  "TMONE Klang Valley Data Center",     "Telekom Malaysia KVDC (Cyberjaya)"
+)
+
+rows_to_drop <- c()
+for (i in seq_len(nrow(known_dupes))) {
+  idx_a <- which(pre_merge$name_normalized == known_dupes$name_a[i] |
+                 pre_merge$name == known_dupes$name_a[i])
+  idx_b <- which(pre_merge$name_normalized == known_dupes$name_b[i] |
+                 pre_merge$name == known_dupes$name_b[i])
+
+  if (length(idx_a) > 0 && length(idx_b) > 0) {
+    keep <- idx_b[1]
+    drop <- idx_a[1]
+
+    if (!is.na(pre_merge$operator_norm[keep]) &&
+        is.na(pre_merge$operator[drop])) {
+    } else if (!is.na(pre_merge$operator[drop]) &&
+               is.na(pre_merge$operator_norm[keep])) {
+      keep <- idx_a[1]
+      drop <- idx_b[1]
+    }
+
+    cat("Dedup:", pre_merge$name_normalized[drop] %||% pre_merge$name[drop],
+        "->", pre_merge$name_normalized[keep] %||% pre_merge$name[keep], "\n")
+
+    pre_merge$sources[keep] <- paste(
+      pre_merge$sources[keep],
+      pre_merge$sources[drop],
+      sep = "; "
+    )
+    pre_merge$n_sources[keep] <- pre_merge$n_sources[keep] + 1L
+
+    rows_to_drop <- c(rows_to_drop, drop)
+  }
+}
+
+if (length(rows_to_drop) > 0) {
+  final_v3 <- pre_merge[-rows_to_drop, ]
+} else {
+  final_v3 <- pre_merge
+}
+
+cat("Post-dedup total:", nrow(final_v3), "\n")
+cat("Duplicates removed:", length(rows_to_drop), "\n")
+cat("With known operator:",
+    sum(!is.na(final_v3$operator) | !is.na(final_v3$operator_norm),
+        na.rm = TRUE), "\n")
 
 category_summary <- final_v3 %>%
   count(source_category, name = "n_facilities") %>%
   arrange(desc(n_facilities))
 
 kable(category_summary,
-      caption = "V3 dataset by source category")
+      caption = "V4 dataset by source category (post-dedup)")
 ```
 
 ## Updated visualization with trade press layer
@@ -1400,23 +1620,24 @@ ggplot(coverage_v3,
 ## Export v3 dataset
 
 ```{r}
-#| label: export-v3
+#| label: export-v4
 
 write.csv(final_v3,
-          file = "outputs/malaysia_datacenters_v3.csv",
+          file = "outputs/malaysia_datacenters_v4.csv",
           row.names = FALSE)
-saveRDS(final_v3, file = "outputs/malaysia_datacenters_v3.rds")
+saveRDS(final_v3, file = "outputs/malaysia_datacenters_v4.rds")
 
-cat("Wrote", nrow(final_v3), "rows to outputs/malaysia_datacenters_v3.csv\n")
+cat("Wrote", nrow(final_v3), "rows to outputs/malaysia_datacenters_v4.csv\n")
 
-summary_v3 <- final_v3 %>%
-  group_by(source_category) %>%
+summary_v4 <- final_v3 %>%
+  group_by(source_category, facility_type) %>%
   summarise(
     n_facilities     = n(),
-    with_operator    = sum(has_operator, na.rm = TRUE),
+    with_operator    = sum(!is.na(operator), na.rm = TRUE),
+    geocoded         = sum(coord_confidence == "geocoded", na.rm = TRUE),
     .groups = "drop"
   )
 
-kable(summary_v3,
-      caption = "Final v3 dataset summary by source category")
+kable(summary_v4,
+      caption = "Final v4 dataset summary by source category and facility type")
 ```
