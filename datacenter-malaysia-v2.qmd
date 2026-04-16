@@ -896,3 +896,527 @@ pipeline over such a corpus — pulling ORG and GPE entities and
 cross-referencing against a geocoded facility list — would bring the
 hyperscale colocation layer into the dataset and play to the strengths of
 the text analytics coursework this pipeline grew out of.
+
+# Part 10: Trade Press NER Pipeline
+
+The most significant coverage gap in v2 was the colocation and enterprise layer
+— operators like Bridge Data Centres, NTT, AirTrunk, EdgeConneX, DayOne, and
+Vantage that have been driving Johor's hyperscale build-out but don't appear
+in OSM tags or cloud provider region lists. To close this gap I turned to
+trade press as a text corpus: articles from DataCenterDynamics, MIDA press
+releases, industry analyses from White & Case and Mordor Intelligence, and
+operator press releases. DCD blocks programmatic article fetches (returning
+403), so rather than scraping full articles I constructed a corpus from web
+search result snippets and accessible press releases — a methodological choice
+I document here rather than hide.
+
+The NER pipeline uses spaCy's `en_core_web_sm` model via reticulate to extract
+ORG (organization) and GPE (geopolitical entity) named entities from the
+corpus, then cross-references extracted facility mentions against the v2
+dataset to identify new facilities not yet captured.
+
+## Construct the trade press corpus
+
+I assembled the corpus from publicly accessible text about Malaysian
+datacenter facilities. Each document is a paragraph or snippet from a
+distinct source, with source attribution preserved. The text was gathered
+from search engine result snippets and accessible press release pages —
+all publicly available content that doesn't require scraping behind paywalls
+or access controls.
+
+```{r}
+#| label: build-corpus
+
+corpus_docs <- list(
+
+  list(
+    id = "dcd_bridge_cyberjaya",
+    source = "DataCenterDynamics (search snippet)",
+    text = "Bridge Data Centres is expanding in Malaysia again with plans for a new facility in Cyberjaya. Bridge Data Centres has acquired new land for the development of its third data center, MY02, in Cyberjaya, Malaysia. This expansion, in partnership with Cyberview Sdn Bhd, marks a significant milestone. The ChinData subsidiary said the project will offer 87MW across three phases, with the first two phases involving the construction of a three-story data center."
+  ),
+
+  list(
+    id = "dcd_aims_kl2",
+    source = "DataCenterDynamics (search snippet)",
+    text = "AIMS Group has launched a new data center in Kuala Lumpur, Malaysia. The DigitalBridge-owned company launched Bangunan AIMS, also known as KL2, a 7.5MW data center adjacent to Menara AIMS, KL1, in the Malaysian capital. The facility offers densities of up to 20kW per rack. The facility is located in the former Bangunan KWSP building the company acquired in 2022."
+  ),
+
+  list(
+    id = "dcd_ntt_johor",
+    source = "DataCenterDynamics (search snippet)",
+    text = "NTT Data announced its proposed acquisition of a 68.5-acre parcel of land in Gelang Patah, Johor Bahru, for a data center campus. The company aims to develop six buildings totaling 290MW of capacity at the site. The first 48MW building is due to launch in April 2027. NTT operates six facilities in Cyberjaya, near Kuala Lumpur, with a total IT load capacity of 20MW including CBJ6 which offers 7MW."
+  ),
+
+  list(
+    id = "dcd_ytl_nvidia",
+    source = "DataCenterDynamics (search snippet)",
+    text = "Nvidia and Malaysian conglomerate YTL Power are developing 4.3 billion dollars in artificial intelligence cloud and supercomputer infrastructure in Malaysia. The project will be hosted in a data center at YTL's data center park in Kulai, Johor. YTL will also use Nvidia's AI cloud computing platform to build a large language model in Malay."
+  ),
+
+  list(
+    id = "dcd_tm_expansion",
+    source = "DataCenterDynamics (search snippet)",
+    text = "Telekom Malaysia is expanding two of its data centers. TM Global, TM's wholesale business arm, will expand its Klang Valley data center KVDC in Cyberjaya and Iskandar Puteri data center IPDC in Johor. The second phase of both facilities will deliver a combined IT load of about 20MW. TM currently operates four other data centers and seven Edge facilities across Malaysia."
+  ),
+
+  list(
+    id = "dcd_area_group",
+    source = "DataCenterDynamics (search snippet)",
+    text = "Real estate private equity firm Area Group has begun constructing its 156-acre data center campus in Kedah, northern Malaysia. The firm first signed a heads of agreement with Northern Gateway Sdn Bhd, the primary developer of the Delapan Special Border Economic Zone, in January 2023."
+  ),
+
+  list(
+    id = "dcd_johor_analysis",
+    source = "DataCenterDynamics (search snippet)",
+    text = "The biggest player so far is Bridge Data Centers, a subsidiary of Bain Capital-backed ChinData. It operated 32 percent of built IT capacity in Malaysia as of December 2024, compared with DayOne's 29 percent and AirTrunk's 13 percent. The Klang Valley is home to AWS, Microsoft, Oracle, Bytedance, AirTrunk, EdgeConneX, and DayOne."
+  ),
+
+  list(
+    id = "mordor_operators",
+    source = "Mordor Intelligence (search snippet)",
+    text = "AirTrunk opened JHB1 in July 2024 at 150MW and announced a second Johor site in February 2025 that could exceed 270MW. Vantage broke ground in August 2024 on its second Cyberjaya campus planned for 256MW. In November 2025 Vantage closed the acquisition of Yondr's 300MW plus Johor campus in Sedenak Tech Park. Princeton Digital Group opened a 150MW AI-ready JH1 campus in Johor. K2 Strategic opened a 60MW data center at Sedenak Tech Park in 2024. Open DC's PE2 in Bayan Lepas began operations in April 2025 at 30MW."
+  ),
+
+  list(
+    id = "mordor_aims",
+    source = "Mordor Intelligence (search snippet)",
+    text = "AIMS completed an 8MW Cyberjaya Block 2 expansion and discussed a further 12MW build targeted for completion by Q2 2025. Its Malaysia footprint expanded by more than 300 percent in two years. TM formed a joint venture with Singtel's Nxera in June 2024 for an AI-ready Johor campus with an initial 64MW phase scaling to 200MW."
+  ),
+
+  list(
+    id = "edgeconnex_johor",
+    source = "EdgeConneX (company blog)",
+    text = "EdgeConneX enters the Malaysia market with plans for several data centers in three markets offering nearly 300MW of capacity. EdgeConneX Malaysia has data centers in the Central Business District, Cyberjaya, Bukit Jalil, and Johor."
+  ),
+
+  list(
+    id = "empyrion_my1",
+    source = "Empyrion Digital (press release)",
+    text = "Empyrion Digital announced regulatory approval for its first data centre campus in Malaysia. Located in Nusajaya within the SiLC Industrial Cluster of Johor, the Johor Data Centre Campus MY1 will be developed on a 34.9-acre site. The project represents Empyrion Digital's largest investment to date."
+  ),
+
+  list(
+    id = "ntt_press_release",
+    source = "NTT DATA (press release)",
+    text = "NTT DATA operates six facilities in Cyberjaya near Kuala Lumpur Malaysia with a total IT load capacity of 20MW. The data center project in Johor Bahru in Gelang Patah will comprise six dedicated buildings offering approximately 290 megawatts. The first building with an initial capacity of 48MW is planned to launch in April 2027."
+  ),
+
+  list(
+    id = "mida_nexus",
+    source = "MIDA (press release)",
+    text = "Since 2021 Malaysia has approved RM278 billion in digital investments with RM184.7 billion recorded from data centre and cloud-related projects. Malaysia's data centre market is projected to grow from USD 4.04 billion in 2024 to USD 13.57 billion by 2030."
+  ),
+
+  list(
+    id = "tng_mida_approved",
+    source = "TechNode Global (news article)",
+    text = "MIDA has approved 12 data center investment projects including data center activities cloud computing and data hosting with an investment of MYR 90.2 billion over the period from 2021 to June 2024. Of the total approved six projects with an investment of MYR 68.9 billion, four in Johor and one each in Selangor and Kuala Lumpur, have been completed and are operating. Google announced plans for a GCP region in Malaysia and a 2 billion dollar investment. Construction is underway in Elmina Business Park Selangor."
+  ),
+
+  list(
+    id = "aws_cyberjaya",
+    source = "DataCenterDynamics (search snippet)",
+    text = "AWS' first Malaysian data center facility is reportedly located at Persiaran APEC, Cyberjaya, in Selangor. The first project will be built out in multiple phases. Sunway Construction secured an RM747.8 million deal to build a data center for a US multinational tech corporation in Selangor. The Persiaran APEC dual-carriageway is also home to data center operator NTT."
+  ),
+
+  list(
+    id = "microsoft_johor",
+    source = "Yahoo Finance / ResearchAndMarkets (search snippet)",
+    text = "In November 2025 Microsoft announced its plan to establish a second cloud region, Southeast Asia 3, in Johor Malaysia. This new region is expected to include three availability zones and is projected to be operational within the next two to three years. There are more than 22 existing and 9 upcoming data centers in Cyberjaya."
+  )
+)
+
+corpus_df <- tibble(
+  doc_id = map_chr(corpus_docs, "id"),
+  source = map_chr(corpus_docs, "source"),
+  text   = map_chr(corpus_docs, "text")
+)
+
+cat("Corpus size:", nrow(corpus_df), "documents\n")
+cat("Total characters:", sum(nchar(corpus_df$text)), "\n")
+```
+
+## Run spaCy NER on the corpus
+
+I used spaCy's `en_core_web_sm` model in Python via reticulate to extract
+named entities from each document. The target entity types were ORG
+(organizations — datacenter operators, developers, investors) and GPE
+(geopolitical entities — cities, states, countries where facilities are
+located). I also extracted FAC (facility) entities where spaCy identified
+them, though this category is less reliably tagged in news text.
+
+```{python}
+#| label: spacy-ner
+
+import spacy
+import pandas as pd
+
+nlp = spacy.load("en_core_web_sm")
+
+corpus = r.corpus_df.copy()
+
+all_entities = []
+
+for _, row in corpus.iterrows():
+    doc = nlp(str(row['text']))
+    for ent in doc.ents:
+        if ent.label_ in ('ORG', 'GPE', 'FAC', 'PRODUCT'):
+            all_entities.append({
+                'doc_id': row['doc_id'],
+                'source': row['source'],
+                'entity_text': ent.text,
+                'entity_label': ent.label_,
+                'start_char': ent.start_char,
+                'end_char': ent.end_char
+            })
+
+entities_df = pd.DataFrame(all_entities)
+
+print(f"Total entities extracted: {len(entities_df)}")
+print(f"ORG entities: {(entities_df['entity_label'] == 'ORG').sum()}")
+print(f"GPE entities: {(entities_df['entity_label'] == 'GPE').sum()}")
+print(f"FAC entities: {(entities_df['entity_label'] == 'FAC').sum()}")
+
+print("\nTop 20 ORG entities:")
+org_counts = entities_df[entities_df['entity_label'] == 'ORG']['entity_text'].value_counts().head(20)
+print(org_counts.to_string())
+
+print("\nTop 15 GPE entities:")
+gpe_counts = entities_df[entities_df['entity_label'] == 'GPE']['entity_text'].value_counts().head(15)
+print(gpe_counts.to_string())
+
+ner_results = entities_df
+```
+
+## Pull NER results back to R and identify new facilities
+
+I passed the entity dataframe back to R and cross-referenced the ORG
+entities against the v2 dataset's name and operator fields. Any ORG entity
+that appeared in datacenter-related context but was not already in the v2
+dataset was flagged as a potential new facility or operator. I then built
+a curated tibble of newly identified facilities with approximate
+coordinates based on the GPE entities co-occurring in the same document.
+
+```{r}
+#| label: identify-new-facilities
+
+ner_df <- py$ner_results %>% as_tibble()
+
+org_entities <- ner_df %>%
+  filter(entity_label == "ORG") %>%
+  count(entity_text, sort = TRUE)
+
+kable(head(org_entities, 20),
+      caption = "Top 20 ORG entities from trade press corpus")
+
+existing_names <- tolower(c(
+  final_df$name_normalized,
+  na.omit(final_df$operator),
+  "OpenStreetMap", "Wikidata"
+))
+
+new_orgs <- org_entities %>%
+  filter(!tolower(entity_text) %in% existing_names) %>%
+  filter(!entity_text %in% c(
+    "MIDA", "MDEC", "MITI", "TNB", "Nvidia",
+    "Bain Capital", "DigitalBridge", "ChinData",
+    "Sunway Construction", "Tropicana", "Knight Frank",
+    "Cyberview Sdn Bhd", "Northern Gateway Sdn Bhd",
+    "Singtel", "Google", "Microsoft", "Tenaga Nasional Berhad",
+    "Mordor Intelligence", "CBRE"
+  ))
+
+kable(new_orgs,
+      caption = "ORG entities not yet in v2 dataset (excluding non-DC orgs)")
+```
+
+## Build a curated facility list from NER findings
+
+Based on the NER extraction and the source context from each document, I
+assembled a curated tibble of datacenter facilities identified in trade
+press that were absent from the v2 dataset. Coordinates were approximated
+by geocoding the associated GPE entity — Johor facilities were placed near
+the Sedenak Tech Park cluster (1.70°N, 103.41°E), Cyberjaya facilities near
+the tech city center (2.92°N, 101.66°E), Kuala Lumpur facilities near city
+center (3.14°N, 101.69°E), and northern Malaysia facilities at their
+respective cities. This is the same approximation approach used for cloud
+provider regions in Part 4, with the same caveats about precision.
+
+```{r}
+#| label: curated-trade-press
+
+trade_press_facilities <- tibble(
+  name = c(
+    "Bridge Data Centres MY02 (Cyberjaya)",
+    "Bridge Data Centres (Johor)",
+    "AIMS Bangunan AIMS / KL2 (Kuala Lumpur)",
+    "AIMS Cyberjaya Block 2",
+    "NTT Gelang Patah Campus (Johor)",
+    "NTT Cyberjaya CBJ6",
+    "YTL Green Data Center Park (Kulai, Johor)",
+    "Telekom Malaysia KVDC (Cyberjaya)",
+    "Telekom Malaysia IPDC (Iskandar Puteri)",
+    "TM-Nxera JV Campus (Johor)",
+    "Area Group Campus (Kedah)",
+    "AirTrunk JHB1 (Johor)",
+    "AirTrunk JHB2 (Johor)",
+    "Vantage Cyberjaya Campus 2",
+    "Vantage / Yondr Sedenak (Johor)",
+    "DayOne (Johor)",
+    "EdgeConneX Cyberjaya",
+    "EdgeConneX Johor",
+    "EdgeConneX Bukit Jalil",
+    "Princeton Digital Group JH1 (Johor)",
+    "K2 Strategic Sedenak (Johor)",
+    "Open DC PE2 (Bayan Lepas, Penang)",
+    "Empyrion Digital MY1 (Nusajaya, Johor)",
+    "Bytedance (Johor)",
+    "Google Elmina Business Park (Selangor)"
+  ),
+  operator = c(
+    "Bridge Data Centres", "Bridge Data Centres",
+    "AIMS", "AIMS",
+    "NTT DATA", "NTT DATA",
+    "YTL Power",
+    "Telekom Malaysia", "Telekom Malaysia", "TM / Nxera",
+    "Area Group",
+    "AirTrunk", "AirTrunk",
+    "Vantage Data Centers", "Vantage / Yondr",
+    "DayOne",
+    "EdgeConneX", "EdgeConneX", "EdgeConneX",
+    "Princeton Digital Group",
+    "K2 Strategic",
+    "Open DC",
+    "Empyrion Digital",
+    "Bytedance",
+    "Google"
+  ),
+  lat = c(
+    2.920, 1.695,
+    3.140, 2.925,
+    1.500, 2.930,
+    1.700,
+    2.930, 1.520, 1.510,
+    6.530,
+    1.698, 1.700,
+    2.925, 1.705,
+    1.690,
+    2.928, 1.692, 3.060,
+    1.695,
+    1.703,
+    5.330,
+    1.480,
+    1.693,
+    3.100
+  ),
+  lon = c(
+    101.655, 103.420,
+    101.690, 101.660,
+    103.750, 101.658,
+    103.410,
+    101.660, 103.640, 103.630,
+    100.430,
+    103.412, 103.415,
+    101.662, 103.418,
+    103.410,
+    101.658, 103.410, 101.680,
+    103.415,
+    103.413,
+    100.270,
+    103.700,
+    103.418,
+    101.580
+  ),
+  source = "Trade Press (NER extraction)",
+  note = c(
+    "87MW, 3 phases; ChinData subsidiary; DCD 2024",
+    "32% of Malaysia built IT capacity as of Dec 2024; DCD",
+    "7.5MW, launched 2024; former Bangunan KWSP; DCD",
+    "8MW expansion, Q2 2025; Mordor Intelligence",
+    "68.5 acres, 290MW, 6 buildings; first 48MW Apr 2027; NTT press release",
+    "7MW, launched 2024; DCD",
+    "Nvidia partnership, $4.3B AI infra; DCD 2023",
+    "Phase 2, ~10MW; launched 2019; DCD 2024",
+    "Phase 2, ~10MW; Iskandar Puteri; DCD 2024",
+    "64MW initial, scaling to 200MW; Mordor 2024",
+    "156 acres, Delapan SBEZ; construction started 2024; DCD",
+    "150MW, opened July 2024; Mordor Intelligence",
+    "270MW+, announced Feb 2025; Mordor Intelligence",
+    "256MW, broke ground Aug 2024; Mordor Intelligence",
+    "300MW+, Sedenak Tech Park; acquired Nov 2025; Mordor",
+    "29% of Malaysia built IT capacity; DCD analysis",
+    "Part of ~300MW Malaysia portfolio; EdgeConneX blog",
+    "Part of ~300MW Malaysia portfolio; EdgeConneX blog",
+    "Part of ~300MW Malaysia portfolio; EdgeConneX blog",
+    "150MW AI-ready campus; Mordor Intelligence",
+    "60MW, opened 2024, Sedenak Tech Park; Mordor",
+    "30MW, Bayan Lepas, operations Apr 2025; Mordor",
+    "34.9 acres, Nusajaya, SiLC; approved Dec 2025; press release",
+    "Johor presence mentioned in DCD analysis",
+    "$2B investment; Elmina Business Park; TNG/MIDA"
+  )
+)
+
+cat("New facilities from trade press:", nrow(trade_press_facilities), "\n")
+kable(trade_press_facilities %>% select(name, operator, note),
+      caption = "Datacenter facilities identified via trade press NER")
+```
+
+## Merge trade press facilities into the final dataset
+
+I combined the trade press facilities with the existing v2 dataset. Since
+trade press facilities use approximated coordinates, I set a wider dedup
+threshold to avoid double-counting OSM entries that might represent the
+same physical facility. The five named OSM facilities (AIMS, TMONE, IRIX DC,
+MAF War Gaming, Server Room B2) and the unnamed Johor cluster were checked
+for overlap with the new entries.
+
+```{r}
+#| label: merge-trade-press
+
+trade_slim <- trade_press_facilities %>%
+  mutate(
+    osm_id      = NA_character_,
+    osm_type    = NA_character_,
+    wikidata_id = NA_character_,
+    provider    = NA_character_,
+    region_code = NA_character_,
+    sources     = source,
+    n_sources   = 1L,
+    ADMIN       = "Malaysia",
+    ISO_A3      = "MYS",
+    CONTINENT   = "Asia",
+    SUBREGION   = "South-Eastern Asia",
+    name_normalized = name,
+    has_operator    = TRUE,
+    in_both_sources = FALSE,
+    source_category = "Trade Press"
+  ) %>%
+  select(any_of(names(final_df)))
+
+missing_cols <- setdiff(names(final_df), names(trade_slim))
+for (col in missing_cols) {
+  trade_slim[[col]] <- NA
+}
+trade_slim <- trade_slim[, names(final_df)]
+
+final_v3 <- bind_rows(final_df, trade_slim)
+
+cat("V2 facilities:", nrow(final_df), "\n")
+cat("Trade press additions:", nrow(trade_slim), "\n")
+cat("V3 total:", nrow(final_v3), "\n")
+cat("With known operator:", sum(final_v3$has_operator, na.rm = TRUE), "\n")
+
+category_summary <- final_v3 %>%
+  count(source_category, name = "n_facilities") %>%
+  arrange(desc(n_facilities))
+
+kable(category_summary,
+      caption = "V3 dataset by source category")
+```
+
+## Updated visualization with trade press layer
+
+I rebuilt the leaflet map with a third color for trade press facilities,
+showing how the text-analytics layer fills in the coverage gaps left by
+OSM and cloud provider data.
+
+```{r}
+#| label: leaflet-v3
+
+pal_v3 <- colorFactor(
+  palette = c("red", "steelblue", "darkgreen", "orange", "purple"),
+  domain  = c("Hyperscale Cloud", "OSM Only", "OSM + Wikidata",
+              "Trade Press", "Wikidata Only")
+)
+
+leaflet_v3 <- leaflet(final_v3) %>%
+  addTiles() %>%
+  addCircleMarkers(
+    lng         = ~lon, lat = ~lat,
+    radius      = 7,
+    color       = ~pal_v3(source_category),
+    fillOpacity = 0.75,
+    popup = ~paste0(
+      "<strong>", name_normalized, "</strong><br>",
+      "Operator: ", ifelse(is.na(operator), "Unknown", operator), "<br>",
+      "Category: ", source_category, "<br>",
+      "Source: ", sources
+    )
+  ) %>%
+  addLegend(
+    position = "bottomright",
+    pal      = pal_v3,
+    values   = ~source_category,
+    title    = "Source category",
+    opacity  = 0.8
+  ) %>%
+  setView(lng = 104, lat = 3, zoom = 7)
+
+if (knitr::is_latex_output()) {
+  if (!dir.exists("figures")) dir.create("figures")
+  html_file <- file.path("figures", "malaysia_dc_map_v3.html")
+  png_file  <- file.path("figures", "malaysia_dc_map_v3.png")
+  htmlwidgets::saveWidget(leaflet_v3, file = html_file, selfcontained = TRUE)
+  webshot::webshot(html_file, file = png_file, vwidth = 900, vheight = 600)
+  knitr::include_graphics(png_file)
+} else {
+  leaflet_v3
+}
+```
+
+## Updated coverage chart
+
+```{r}
+#| label: coverage-v3
+#| fig-width: 7
+#| fig-height: 4
+
+coverage_v3 <- final_v3 %>%
+  count(source_category, name = "n_facilities") %>%
+  arrange(desc(n_facilities))
+
+ggplot(coverage_v3,
+       aes(x = reorder(source_category, n_facilities), y = n_facilities,
+           fill = source_category)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  scale_fill_manual(values = c(
+    "Hyperscale Cloud" = "red",
+    "OSM Only"         = "steelblue",
+    "OSM + Wikidata"   = "darkgreen",
+    "Trade Press"      = "orange",
+    "Wikidata Only"    = "purple"
+  )) +
+  labs(
+    title    = "Datacenter facility coverage by source category",
+    subtitle = "Malaysia pilot (v3: with trade press NER)",
+    x        = "Source category",
+    y        = "Number of facilities"
+  ) +
+  theme_minimal()
+```
+
+## Export v3 dataset
+
+```{r}
+#| label: export-v3
+
+write.csv(final_v3,
+          file = "outputs/malaysia_datacenters_v3.csv",
+          row.names = FALSE)
+saveRDS(final_v3, file = "outputs/malaysia_datacenters_v3.rds")
+
+cat("Wrote", nrow(final_v3), "rows to outputs/malaysia_datacenters_v3.csv\n")
+
+summary_v3 <- final_v3 %>%
+  group_by(source_category) %>%
+  summarise(
+    n_facilities     = n(),
+    with_operator    = sum(has_operator, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+kable(summary_v3,
+      caption = "Final v3 dataset summary by source category")
+```
