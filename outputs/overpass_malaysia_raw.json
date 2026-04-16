@@ -1,0 +1,276 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API 0.7.62.11 87bfad18",
+  "osm3s": {
+    "timestamp_osm_base": "2026-04-16T15:25:30Z",
+    "timestamp_areas_base": "2026-04-16T06:15:20Z",
+    "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+  },
+  "elements": [
+
+{
+  "type": "node",
+  "id": 7001771562,
+  "lat": 5.4057625,
+  "lon": 103.0913249,
+  "tags": {
+    "name": "Server Room B2",
+    "ref": "Unit Rangkaian",
+    "telecom": "data_center"
+  }
+},
+{
+  "type": "node",
+  "id": 10939660647,
+  "lat": 3.1743861,
+  "lon": 101.7293923,
+  "tags": {
+    "name": "MAF War Gaming Simulation Center",
+    "telecom": "data_center"
+  }
+},
+{
+  "type": "node",
+  "id": 13197364001,
+  "lat": 1.7096888,
+  "lon": 110.3534142,
+  "tags": {
+    "addr:city": "Kuching",
+    "addr:country": "MY",
+    "addr:housenumber": "Lot 727",
+    "addr:postcode": "93010",
+    "addr:street": "Jalan Sultan Tengah, Santubong",
+    "name": "IRIX DC",
+    "telecom": "data_center"
+  }
+},
+{
+  "type": "way",
+  "id": 848498975,
+  "center": {
+    "lat": 2.9325346,
+    "lon": 101.6573189
+  },
+  "tags": {
+    "landuse": "industrial",
+    "name": "TMONE Klang Valley Data Center",
+    "name:en": "TMONE Klang Valley Data Center",
+    "telecom": "data_center"
+  }
+},
+{
+  "type": "way",
+  "id": 1080495340,
+  "center": {
+    "lat": 2.9377516,
+    "lon": 101.6573578
+  },
+  "tags": {
+    "construction": "industrial",
+    "landuse": "construction",
+    "name": "AIMS",
+    "name:en": "AIMS",
+    "name:ms": "AIMS",
+    "telecom": "data_center",
+    "website": "https://aims.com.my/"
+  }
+},
+{
+  "type": "way",
+  "id": 1432337885,
+  "center": {
+    "lat": 1.7033833,
+    "lon": 103.4134036
+  },
+  "tags": {
+    "building": "data_center",
+    "source": "Sentinel and https://www.youtube.com/watch?v=n2b0ljMXyEg -  can be refined if better images are available",
+    "telecom": "data_center"
+  }
+},
+{
+  "type": "way",
+  "id": 1432337898,
+  "center": {
+    "lat": 1.6939827,
+    "lon": 103.4190473
+  },
+  "tags": {
+    "building": "data_center",
+    "source": "Sentinel and https://www.youtube.com/watch?v=n2b0ljMXyEg -  can be refined if better images are available",
+    "telecom": "data_center"
+  }
+},
+{
+  "type": "way",
+  "id": 1432337899,
+  "center": {
+    "lat": 1.6921349,
+    "lon": 103.4123772
+  },
+  "tags": {
+    "building": "data_center",
+    "source": "Sentinel and https://www.youtube.com/watch?v=n2b0ljMXyEg -  can be refined if better images are available",
+    "telecom": "data_center"
+  }
+},
+{
+  "type": "way",
+  "id": 1432337900,
+  "center": {
+    "lat": 1.6930986,
+    "lon": 103.4179246
+  },
+  "tags": {
+    "building": "data_center",
+    "source": "Sentinel and https://www.youtube.com/watch?v=n2b0ljMXyEg -  can be refined if better images are available",
+    "telecom": "data_center"
+  }
+},
+{
+  "type": "way",
+  "id": 1432337901,
+  "center": {
+    "lat": 1.6923957,
+    "lon": 103.4170640
+  },
+  "tags": {
+    "building": "data_center",
+    "source": "Sentinel and https://www.youtube.com/watch?v=n2b0ljMXyEg -  can be refined if better images are available",
+    "telecom": "data_center"
+  }
+},
+{
+  "type": "way",
+  "id": 1432337902,
+  "center": {
+    "lat": 1.6977265,
+    "lon": 103.4117312
+  },
+  "tags": {
+    "building": "data_center",
+    "source": "Sentinel and https://www.youtube.com/watch?v=n2b0ljMXyEg -  can be refined if better images are available",
+    "telecom": "data_center"
+  }
+},
+{
+  "type": "way",
+  "id": 1432337903,
+  "center": {
+    "lat": 1.6984869,
+    "lon": 103.4125333
+  },
+  "tags": {
+    "building": "data_center",
+    "source": "Sentinel and https://www.youtube.com/watch?v=n2b0ljMXyEg -  can be refined if better images are available",
+    "telecom": "data_center"
+  }
+},
+{
+  "type": "way",
+  "id": 1432337904,
+  "center": {
+    "lat": 1.6999400,
+    "lon": 103.4128608
+  },
+  "tags": {
+    "building": "data_center",
+    "source": "Sentinel and https://www.youtube.com/watch?v=n2b0ljMXyEg -  can be refined if better images are available",
+    "telecom": "data_center"
+  }
+},
+{
+  "type": "way",
+  "id": 1432337905,
+  "center": {
+    "lat": 1.6975615,
+    "lon": 103.4076651
+  },
+  "tags": {
+    "building": "data_center",
+    "source": "Sentinel and https://www.youtube.com/watch?v=n2b0ljMXyEg -  can be refined if better images are available",
+    "telecom": "data_center"
+  }
+},
+{
+  "type": "way",
+  "id": 1432337908,
+  "center": {
+    "lat": 1.7046043,
+    "lon": 103.4124340
+  },
+  "tags": {
+    "building": "data_center",
+    "source": "Sentinel and https://www.youtube.com/watch?v=n2b0ljMXyEg -  can be refined if better images are available",
+    "telecom": "data_center"
+  }
+},
+{
+  "type": "way",
+  "id": 1432337909,
+  "center": {
+    "lat": 1.7029916,
+    "lon": 103.4103001
+  },
+  "tags": {
+    "building": "data_center",
+    "source": "Sentinel and https://www.youtube.com/watch?v=n2b0ljMXyEg -  can be refined if better images are available",
+    "telecom": "data_center"
+  }
+},
+{
+  "type": "way",
+  "id": 1432337910,
+  "center": {
+    "lat": 1.7019183,
+    "lon": 103.4089932
+  },
+  "tags": {
+    "building": "data_center",
+    "source": "Sentinel and https://www.youtube.com/watch?v=n2b0ljMXyEg -  can be refined if better images are available",
+    "telecom": "data_center"
+  }
+},
+{
+  "type": "way",
+  "id": 1432337911,
+  "center": {
+    "lat": 1.6988159,
+    "lon": 103.4106934
+  },
+  "tags": {
+    "building": "data_center",
+    "source": "Sentinel and https://www.youtube.com/watch?v=n2b0ljMXyEg -  can be refined if better images are available",
+    "telecom": "data_center"
+  }
+},
+{
+  "type": "way",
+  "id": 1432337912,
+  "center": {
+    "lat": 1.6942378,
+    "lon": 103.4208341
+  },
+  "tags": {
+    "building": "data_center",
+    "source": "Sentinel and https://www.youtube.com/watch?v=n2b0ljMXyEg -  can be refined if better images are available",
+    "telecom": "data_center"
+  }
+},
+{
+  "type": "way",
+  "id": 1448536198,
+  "center": {
+    "lat": 3.2230752,
+    "lon": 101.5202934
+  },
+  "tags": {
+    "building": "industrial",
+    "industrial": "data_centre",
+    "telecom": "data_center"
+  }
+}
+
+  ]
+}
+
