@@ -58,7 +58,7 @@ operations, and mapping.
 #| warning: false
 
 Sys.setenv(RETICULATE_PYTHON = "/opt/anaconda3/envs/textmining/bin/python")
-Sys.setenv(GOOGLE_API_KEY = "AIzaSyCtKec4kSpO6Ew3eTq2AFsNGCZA0J9hSBk")
+Sys.setenv(GOOGLE_API_KEY = "")
 library(reticulate)
 use_condaenv("textmining", required = TRUE)
 
