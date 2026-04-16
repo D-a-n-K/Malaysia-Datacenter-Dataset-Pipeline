@@ -59,7 +59,6 @@ operations, and mapping.
 
 readRenviron(".Renviron")
 Sys.setenv(RETICULATE_PYTHON = "/opt/anaconda3/envs/textmining/bin/python")
-Sys.setenv(GOOGLE_API_KEY = "")
 library(reticulate)
 use_condaenv("textmining", required = TRUE)
 
@@ -1470,8 +1469,10 @@ for (col in missing_in_trade) {
 }
 
 common_cols <- intersect(names(final_df_aug), names(trade_slim))
-trade_slim    <- trade_slim[, common_cols]
-final_df_aug  <- final_df_aug[, common_cols]
+trade_slim    <- trade_slim %>% select(all_of(common_cols))
+final_df_aug  <- final_df_aug %>% select(all_of(common_cols))
+
+stopifnot(identical(names(trade_slim), names(final_df_aug)))
 
 pre_merge <- bind_rows(final_df_aug, trade_slim)
 
@@ -1534,6 +1535,141 @@ category_summary <- final_v3 %>%
 
 kable(category_summary,
       caption = "V4 dataset by source category (post-dedup)")
+```
+
+```{r}
+#| label: fix-bad-geocodes
+
+corrections <- tribble(
+  ~name,                           ~lat_fixed,  ~lon_fixed,
+  "AirTrunk JHB2 (Johor)",        1.430,       103.600,
+  "Bridge Data Centres (Johor)",   1.680,       103.430,
+  "K2 Strategic Sedenak (Johor)",  1.700,       103.400,
+  "AIMS Cyberjaya Block 2",        2.938,       101.657
+)
+
+for (i in seq_len(nrow(corrections))) {
+  idx <- which(final_v3$name == corrections$name[i] |
+               final_v3$name_normalized == corrections$name[i])
+  if (length(idx) > 0) {
+    cat("Fixing:", corrections$name[i],
+        "\n  Old:", final_v3$lat[idx[1]], final_v3$lon[idx[1]],
+        "\n  New:", corrections$lat_fixed[i], corrections$lon_fixed[i], "\n")
+    final_v3$lat[idx[1]] <- corrections$lat_fixed[i]
+    final_v3$lon[idx[1]] <- corrections$lon_fixed[i]
+    final_v3$coord_confidence[idx[1]] <- "manual_correction"
+  }
+}
+```
+
+```{r}
+#| label: cluster-unnamed
+
+final_v3 <- final_v3 %>%
+  mutate(
+    cluster_id = case_when(
+      str_detect(name_normalized, "Unnamed facility") &
+        lat > 1.68 & lat < 1.71 &
+        lon > 103.40 & lon < 103.43 ~ "sedenak_cluster",
+      TRUE ~ NA_character_
+    )
+  )
+
+n_clustered <- sum(!is.na(final_v3$cluster_id))
+cat("Unnamed polygons tagged with cluster_id:", n_clustered, "\n")
+cat("These likely correspond to YTL, K2 Strategic, and/or Princeton Digital",
+    "campuses in Sedenak Tech Park. Operator attribution deferred to",
+    "Google Earth review.\n")
+```
+
+```{r}
+#| label: reverse-geocode-addresses
+
+library(ggmap)
+
+if (Sys.getenv("GOOGLE_API_KEY") != "") {
+  register_google(key = Sys.getenv("GOOGLE_API_KEY"))
+
+  geocodeable <- final_v3 %>%
+    mutate(row_idx = row_number()) %>%
+    filter(
+      !is.na(lat), !is.na(lon),
+      facility_type != "cloud_region",
+      coord_confidence %in% c("source_native", "geocoded", "manual_correction")
+    )
+
+  cat("Reverse geocoding", nrow(geocodeable), "facilities...\n")
+
+  addresses <- map2_chr(geocodeable$lat, geocodeable$lon, function(lt, ln) {
+    Sys.sleep(0.5)
+    tryCatch({
+      result <- revgeocode(c(ln, lt), output = "address")
+      result
+    }, error = function(e) NA_character_)
+  })
+
+  final_v3$address <- NA_character_
+  final_v3$address[geocodeable$row_idx] <- addresses
+
+  cloud_idx <- which(final_v3$facility_type == "cloud_region")
+  final_v3$address[cloud_idx] <- "Address not publicly disclosed"
+
+  approx_idx <- which(final_v3$coord_confidence == "city_approximation")
+  final_v3$address[approx_idx] <- paste0(
+    "Approximate (city-level): ",
+    ifelse(!is.na(final_v3$address[approx_idx]),
+           final_v3$address[approx_idx], "")
+  )
+
+  cat("Addresses populated:", sum(!is.na(final_v3$address)), "of",
+      nrow(final_v3), "\n")
+
+} else {
+  final_v3$address <- NA_character_
+  cat("No Google API key; skipping reverse geocoding\n")
+}
+
+kable(
+  final_v3 %>%
+    filter(!is.na(address), address != "") %>%
+    select(name_normalized, address, coord_confidence) %>%
+    head(15),
+  caption = "Sample reverse-geocoded addresses"
+)
+```
+
+```{r}
+#| label: audit-year-status
+
+year_status_issues <- final_v3 %>%
+  filter(!is.na(year), !is.na(status)) %>%
+  select(name_normalized, operator, status, year) %>%
+  mutate(
+    flag = case_when(
+      status == "Planned" & year <= 2024 ~
+        "Year may be announcement date, not operational date",
+      status == "Operational" & year >= 2026 ~
+        "Operational status unlikely if year is future",
+      TRUE ~ "OK"
+    )
+  ) %>%
+  filter(flag != "OK")
+
+if (nrow(year_status_issues) > 0) {
+  cat("Year/status inconsistencies found:\n\n")
+  kable(year_status_issues %>% select(name_normalized, status, year, flag),
+        caption = "Year/status audit flags")
+} else {
+  cat("No year/status inconsistencies detected.\n")
+}
+
+status_breakdown <- final_v3 %>%
+  filter(facility_type == "physical_facility") %>%
+  count(status, sort = TRUE)
+
+cat("\nPhysical facility status breakdown:\n")
+kable(status_breakdown,
+      caption = "Physical facility status distribution")
 ```
 
 ## Updated visualization with trade press layer
@@ -1618,7 +1754,7 @@ ggplot(coverage_v3,
   theme_minimal()
 ```
 
-## Export v3 dataset
+## Export v4 dataset
 
 ```{r}
 #| label: export-v4
@@ -1635,10 +1771,427 @@ summary_v4 <- final_v3 %>%
   summarise(
     n_facilities     = n(),
     with_operator    = sum(!is.na(operator), na.rm = TRUE),
+    with_address     = sum(!is.na(address) & address != "", na.rm = TRUE),
     geocoded         = sum(coord_confidence == "geocoded", na.rm = TRUE),
+    manual_fix       = sum(coord_confidence == "manual_correction", na.rm = TRUE),
     .groups = "drop"
   )
 
 kable(summary_v4,
       caption = "Final v4 dataset summary by source category and facility type")
+```
+# Part 11: Manual Curation from Public Sources
+
+The NER pipeline in Part 10 demonstrated the text-analytics methodology but
+was limited by corpus size to 25 trade press facilities. To close the
+remaining coverage gap, I compiled additional facilities directly from
+publicly accessible sources: operator website location pages, industry
+directory search result snippets, press releases, and analyst reports. Each
+entry includes the source it was identified from. This is manual curation
+rather than automated extraction, and I document it as such rather than
+routing it through a NER pipeline that would function as a formality given
+that the target facilities are already known from the v4 audit.
+
+The facilities below were absent from the v4 dataset and were identified
+through targeted searches for operators flagged in the audit: VADS, Equinix,
+GDS/DayOne, STT GDC, Keppel, STACK, Hitachi Sunway, NEXTDC, Basis Bay,
+Regal Orion, Microsoft physical sites, and YTL individual buildings.
+
+## Compile curated facility list
+
+```{r}
+#| label: curated-manual
+
+library(ggmap)
+
+curated_facilities <- tibble(
+  name = c(
+    # Equinix
+    "Equinix KL1 (Cyberjaya)",
+    "Equinix JH1 (Iskandar Puteri, Johor)",
+    # GDS / DayOne
+    "GDS Nusajaya NTP1 (Johor)",
+    "GDS Nusajaya NTP2 (Johor)",
+    "GDS Nusajaya NTP3 (Johor)",
+    "GDS Kempas Lama (Johor)",
+    # STT GDC
+    "STT Cyberjaya DC.2",
+    "STT Johor 1 (Nusa Cemerlang)",
+    # VADS / Telekom Malaysia
+    "VADS CBJ1 (Cyberjaya)",
+    "VADS CBJ2 (Cyberjaya)",
+    "VADS CBJ5 (Cyberjaya)",
+    "VADS CBJ6 (Cyberjaya)",
+    "VADS CBJ7 (Cyberjaya)",
+    "VADS CBJ8 (Cyberjaya)",
+    # Keppel
+    "Keppel DC Johor 1 (Iskandar Puteri)",
+    # STACK
+    "STACK JHB01 (Johor Bahru)",
+    # Hitachi Sunway
+    "Hitachi Sunway DC CX2 (Cyberjaya)",
+    "Hitachi Sunway DC Jalan Impact (Cyberjaya)",
+    "Hitachi Sunway DC Century Square (Cyberjaya)",
+    # NEXTDC
+    "NEXTDC KL1 (Kuala Lumpur)",
+    # Microsoft physical sites
+    "Microsoft Kulai (Johor)",
+    "Microsoft Nusa Cemerlang (Johor)",
+    # Vantage (missing from v4)
+    "Vantage KUL1 Campus (Cyberjaya)",
+    "Vantage KUL2 Campus (Cyberjaya)",
+    # YTL individual buildings
+    "YTL Johor Data Center 1 (Kulai)",
+    "YTL Johor Data Center 2 (Kulai)",
+    "YTL Johor Data Center 3 (Kulai)",
+    # Basis Bay
+    "Basis Bay Glenmarie (Shah Alam)",
+    "Basis Bay Cyberjaya",
+    # Princeton Digital (specific campus)
+    "Princeton Digital JH1 Campus (Sedenak)",
+    # Regal Orion
+    "Regal Orion Labu (Negeri Sembilan)",
+    # Open DC (missing Cyberjaya site)
+    "Open DC CJ1 (Cyberjaya)",
+    "Open DC JB1 (Johor Bahru)",
+    # MN Holdings / Shanghai DC-Science
+    "MN Holdings DC (Johor)",
+    # Infinaxis
+    "Infinaxis Cyberjaya 1",
+    # PLTPro
+    "PLTPro CX2 (Cyberjaya)",
+    # Edge Centres
+    "Edge Centres EC31 (Kuala Lumpur)",
+    # Telstra
+    "Telstra Cyberjaya Teleport"
+  ),
+  operator = c(
+    "Equinix", "Equinix",
+    "GDS / DayOne", "GDS / DayOne", "GDS / DayOne", "GDS / DayOne",
+    "STT GDC / Basis Bay", "STT GDC",
+    "VADS (TM subsidiary)", "VADS (TM subsidiary)",
+    "VADS (TM subsidiary)", "VADS (TM subsidiary)",
+    "VADS (TM subsidiary)", "VADS (TM subsidiary)",
+    "Keppel Data Centres",
+    "STACK Infrastructure",
+    "Hitachi Sunway", "Hitachi Sunway", "Hitachi Sunway",
+    "NEXTDC",
+    "Microsoft", "Microsoft",
+    "Vantage Data Centers", "Vantage Data Centers",
+    "YTL Data Center Holdings", "YTL Data Center Holdings",
+    "YTL Data Center Holdings",
+    "Basis Bay", "Basis Bay",
+    "Princeton Digital Group",
+    "Regal Orion",
+    "Open DC", "Open DC",
+    "MN Holdings / Shanghai DC-Science",
+    "Infinaxis",
+    "PLTPro",
+    "Edge Centres",
+    "Telstra International"
+  ),
+  geocode_query = c(
+    "Equinix KL1 Jalan Cyber Point 4 Cyberjaya Malaysia",
+    "Equinix JH1 Nusajaya Tech Park Iskandar Puteri Johor Malaysia",
+    "GDS Nusajaya Tech Park data center Johor Malaysia",
+    "GDS Nusajaya Tech Park data center Johor Malaysia",
+    "GDS Nusajaya Tech Park data center Johor Malaysia",
+    "GDS Kempas Lama data center Johor Malaysia",
+    "STT GDC Cyberjaya data center Malaysia",
+    "Nusa Cemerlang Industrial Park Iskandar Puteri Johor Malaysia",
+    "VADS Cyberjaya Lingkaran Usahawan Malaysia",
+    "VADS Cyberjaya Bangunan TM Malaysia",
+    "VADS CBJ5 Jalan Teknokrat 6 Cyberjaya Malaysia",
+    "VADS CBJ6 CX2 Jalan Impact Cyberjaya Malaysia",
+    "VADS CBJ7 Cyberjaya Malaysia",
+    "VADS CBJ8 MyTelehaus CJ1 Jalan Cyber Point 4 Cyberjaya Malaysia",
+    "Keppel DC Johor 1 Iskandar Puteri Malaysia",
+    "STACK Infrastructure Johor Bahru Malaysia",
+    "Hitachi Sunway CX2 Jalan Impact Cyberjaya Malaysia",
+    "Hitachi Sunway Jalan Impact Cyberjaya Malaysia",
+    "Hitachi Sunway Century Square Cyberjaya Malaysia",
+    "NEXTDC KL1 Kuala Lumpur Malaysia",
+    "Microsoft data center Kulai Johor Malaysia",
+    "Microsoft data center Nusa Cemerlang Johor Malaysia",
+    "Vantage KUL1 Persiaran APEC Cyberjaya Malaysia",
+    "Vantage KUL2 Cyberjaya Malaysia",
+    "YTL Green Data Center Park Kulai Johor Malaysia",
+    "YTL Green Data Center Park Kulai Johor Malaysia",
+    "YTL Green Data Center Park Kulai Johor Malaysia",
+    "Basis Bay data center Glenmarie Shah Alam Malaysia",
+    "Basis Bay data center Cyberjaya Malaysia",
+    "Princeton Digital JH1 Sedenak Tech Park Johor Malaysia",
+    "Regal Orion data center Labu Negeri Sembilan Malaysia",
+    "Open DC CJ1 Jalan Cyber Point 4 Cyberjaya Malaysia",
+    "Open DC Menara MSC Cyberport Johor Bahru Malaysia",
+    "MN Holdings data center Johor Malaysia",
+    "Infinaxis Cyberjaya Malaysia",
+    "PLTPro CX2 Computer Exchange Cyberjaya Malaysia",
+    "Edge Centres EC31 Kuala Lumpur Malaysia",
+    "Telstra Cyberjaya teleport Malaysia"
+  ),
+  source = "Manual Curation (public sources)",
+  note = c(
+    "900 cabinets, 2630 sqm; Jalan Cyber Point 4; opened 2024; Equinix press release",
+    "500 cabinets, 1800 sqm; Nusajaya Tech Park NTP; $40M investment; opened 2024; Equinix blog",
+    "Phase 1; 69.5MW total across NTP1-3; Nusajaya Tech Park; launched 2023; GDS press release",
+    "Phase 1; part of 69.5MW NTP campus; Nusajaya Tech Park; GDS press release",
+    "Phase 1; part of 69.5MW NTP campus; Nusajaya Tech Park; GDS press release",
+    "New campus; Kempas Lama, Johor; Baxtel",
+    "JV with Basis Bay; ~20MW across 2 buildings; LEED Gold target; STT GDC press release",
+    "16MW first building; 22 acres, 120MW total campus; Nusa Cemerlang; groundbreaking Feb 2025; DCD",
+    "Lingkaran Usahawan 1 Timur; Tier 3; datacentermap.com search snippet",
+    "Bangunan TM CBJ Unit 2, Jalan Lingkaran Fauna; datacentermap.com snippet",
+    "CSF Computer Exchange, 3552 Jalan Teknokrat 6; datacentermap.com snippet",
+    "CX2 Computer Exchange, 7118 Jalan Impact; datacentermap.com snippet",
+    "Cyberjaya; VADS Berhad; datacentermap.com",
+    "MyTelehaus CJ1 Centre, Jalan Cyber Point 4; datacentercatalog.com",
+    "BTS for Microsoft Azure; Iskandar Puteri; Keppel-controlled; Dgtl Infra",
+    "10.8 hectares; cloud and AI/ML workloads; datacentermap.com snippet",
+    "CX2 Computer Exchange, 7118 Jalan Impact; datacentermap.com snippet",
+    "Jalan Impact (formerly Jalan Teknologi 1); datacentermap.com snippet",
+    "Block 2310, Jalan Usahawan, Century Square; datacentermap.com snippet",
+    "65MW colocation; announced; GlobeNewswire / Arizton report",
+    "Part of Azure Malaysia region; Kulai, Johor; XLSX reference",
+    "Part of Azure Malaysia region; Nusa Cemerlang; XLSX reference",
+    "31MW; 4 multi-story buildings; Persiaran APEC; Vantage website",
+    "436MW planned; 52 acres; adjacent to KUL1; Vantage website",
+    "Part of 275-acre YTL Green Data Center Park; Kulai; FULCRUM analysis",
+    "Part of 275-acre YTL Green Data Center Park; Kulai; FULCRUM analysis",
+    "Part of 275-acre YTL Green Data Center Park; Kulai; FULCRUM analysis",
+    "One of Malaysia's first carrier-neutral DCs; 27+ years; STT GDC JV announcement",
+    "Cyberjaya facility; Basis Bay; STT GDC JV announcement",
+    "700-acre campus; Sedenak Tech Park; hyperscaler-focused; datacentermap.com snippet",
+    "Labu, Negeri Sembilan; local provider; Dgtl Infra mention",
+    "Jalan Cyber Point 4, Cyber 8; Cyberjaya; datacentermap.com",
+    "Menara MSC Cyberport, Jalan Bukit Meldrum; Johor Bahru; datacentermap.com",
+    "US$600M facility; JV with Shanghai DC-Science; FULCRUM analysis",
+    "Multimedia Super Corridor; Tier III target; datacentermap.com snippet",
+    "CX2 Computer Exchange; Cyberjaya; datacentermap.com snippet",
+    "First Asian facility; Kuala Lumpur; announced 2024; Baxtel",
+    "Satellite teleport + DC; Cyberjaya; partnered with local operator; Mordor Intelligence"
+  ),
+  status = c(
+    "Operational", "Operational",
+    "Operational", "Operational", "Operational", "Under Construction",
+    "Under Construction", "Under Construction",
+    "Operational", "Operational", "Operational", "Operational",
+    "Operational", "Operational",
+    "Operational",
+    "Under Construction",
+    "Operational", "Operational", "Operational",
+    "Planned",
+    "Under Construction", "Under Construction",
+    "Operational", "Under Construction",
+    "Operational", "Operational", "Operational",
+    "Operational", "Operational",
+    "Operational",
+    "Operational",
+    "Operational", "Operational",
+    "Under Construction",
+    "Operational",
+    "Operational",
+    "Planned",
+    "Operational"
+  ),
+  facility_type = "physical_facility"
+)
+
+# Geocode if API key is available
+if (Sys.getenv("GOOGLE_API_KEY") != "") {
+  register_google(key = Sys.getenv("GOOGLE_API_KEY"))
+
+  cat("Geocoding", nrow(curated_facilities), "curated facilities...\n")
+
+  curated_facilities <- curated_facilities %>%
+    mutate(
+      geo_result = map(geocode_query, function(q) {
+        Sys.sleep(0.5)
+        tryCatch(
+          geocode(q, output = "latlon"),
+          error = function(e) tibble(lon = NA_real_, lat = NA_real_)
+        )
+      })
+    ) %>%
+    unnest(geo_result) %>%
+    mutate(
+      in_malaysia = lat > 0.5 & lat < 7.5 & lon > 99 & lon < 120,
+      coord_confidence = ifelse(!is.na(lat) & in_malaysia,
+                                "geocoded", "city_approximation")
+    ) %>%
+    select(-geocode_query, -in_malaysia)
+
+} else {
+  cat("No API key; skipping geocoding for curated facilities\n")
+  curated_facilities <- curated_facilities %>%
+    mutate(lat = NA_real_, lon = NA_real_,
+           coord_confidence = "not_geocoded") %>%
+    select(-geocode_query)
+}
+
+cat("Curated facilities:", nrow(curated_facilities), "\n")
+kable(curated_facilities %>% select(name, operator, status),
+      caption = "Manually curated facilities from public sources")
+```
+
+## Merge curated facilities into the dataset
+
+```{r}
+#| label: merge-curated
+
+curated_slim <- curated_facilities %>%
+  mutate(
+    osm_id          = NA_character_,
+    osm_type        = NA_character_,
+    wikidata_id     = NA_character_,
+    provider        = NA_character_,
+    region_code     = NA_character_,
+    sources         = source,
+    n_sources       = 1L,
+    ADMIN           = "Malaysia",
+    ISO_A3          = "MYS",
+    CONTINENT       = "Asia",
+    SUBREGION       = "South-Eastern Asia",
+    name_normalized = name,
+    has_operator    = TRUE,
+    in_both_sources = FALSE,
+    source_category = "Manual Curation",
+    operator_norm   = operator,
+    year            = str_extract(note, "20[0-9]{2}") %>% as.integer()
+  )
+
+# Align columns
+all_cols <- union(names(final_v3), names(curated_slim))
+for (col in setdiff(all_cols, names(final_v3))) {
+  final_v3[[col]] <- NA
+}
+for (col in setdiff(all_cols, names(curated_slim))) {
+  curated_slim[[col]] <- NA
+}
+
+common_cols <- intersect(names(final_v3), names(curated_slim))
+curated_slim <- curated_slim %>% select(all_of(common_cols))
+final_v3     <- final_v3 %>% select(all_of(common_cols))
+
+final_v5 <- bind_rows(final_v3, curated_slim)
+
+cat("V4 facilities:", nrow(final_v3), "\n")
+cat("Curated additions:", nrow(curated_slim), "\n")
+cat("V5 total:", nrow(final_v5), "\n")
+cat("With known operator:",
+    sum(!is.na(final_v5$operator), na.rm = TRUE), "\n")
+
+category_summary <- final_v5 %>%
+  count(source_category, name = "n_facilities") %>%
+  arrange(desc(n_facilities))
+
+kable(category_summary,
+      caption = "V5 dataset by source category")
+```
+
+## Updated map with all source layers
+
+```{r}
+#| label: leaflet-v5
+
+pal_v5 <- colorFactor(
+  palette = c("red", "steelblue", "darkgreen", "orange",
+              "darkviolet", "purple"),
+  domain  = c("Hyperscale Cloud", "OSM Only", "OSM + Wikidata",
+              "Trade Press", "Manual Curation", "Wikidata Only")
+)
+
+leaflet_v5 <- leaflet(final_v5) %>%
+  addTiles() %>%
+  addCircleMarkers(
+    lng         = ~lon, lat = ~lat,
+    radius      = 6,
+    color       = ~pal_v5(source_category),
+    fillOpacity = 0.75,
+    popup = ~paste0(
+      "<strong>", name_normalized, "</strong><br>",
+      "Operator: ", ifelse(is.na(operator), "Unknown", operator), "<br>",
+      "Status: ", ifelse(is.na(status), "Unknown", status), "<br>",
+      "Category: ", source_category
+    )
+  ) %>%
+  addLegend(
+    position = "bottomright",
+    pal      = pal_v5,
+    values   = ~source_category,
+    title    = "Source category",
+    opacity  = 0.8
+  ) %>%
+  setView(lng = 104, lat = 3, zoom = 7)
+
+if (knitr::is_latex_output()) {
+  if (!dir.exists("figures")) dir.create("figures")
+  html_file <- file.path("figures", "malaysia_dc_map_v5.html")
+  png_file  <- file.path("figures", "malaysia_dc_map_v5.png")
+  htmlwidgets::saveWidget(leaflet_v5, file = html_file, selfcontained = TRUE)
+  webshot::webshot(html_file, file = png_file, vwidth = 900, vheight = 600)
+  knitr::include_graphics(png_file)
+} else {
+  leaflet_v5
+}
+```
+
+## Updated coverage chart
+
+```{r}
+#| label: coverage-v5
+#| fig-width: 7
+#| fig-height: 5
+
+coverage_v5 <- final_v5 %>%
+  count(source_category, name = "n_facilities") %>%
+  arrange(desc(n_facilities))
+
+ggplot(coverage_v5,
+       aes(x = reorder(source_category, n_facilities), y = n_facilities,
+           fill = source_category)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  scale_fill_manual(values = c(
+    "Hyperscale Cloud"  = "red",
+    "OSM Only"          = "steelblue",
+    "OSM + Wikidata"    = "darkgreen",
+    "Trade Press"       = "orange",
+    "Manual Curation"   = "darkviolet",
+    "Wikidata Only"     = "purple"
+  )) +
+  labs(
+    title    = "Datacenter facility coverage by source category",
+    subtitle = "Malaysia pilot (v5: with manual curation)",
+    x        = "Source category",
+    y        = "Number of facilities"
+  ) +
+  theme_minimal()
+```
+
+## Export v5 dataset
+
+```{r}
+#| label: export-v5
+
+write.csv(final_v5,
+          file = "outputs/malaysia_datacenters_v5.csv",
+          row.names = FALSE)
+saveRDS(final_v5, file = "outputs/malaysia_datacenters_v5.rds")
+
+cat("Wrote", nrow(final_v5), "rows to outputs/malaysia_datacenters_v5.csv\n")
+
+summary_v5 <- final_v5 %>%
+  group_by(source_category, facility_type) %>%
+  summarise(
+    n_facilities  = n(),
+    with_operator = sum(!is.na(operator), na.rm = TRUE),
+    operational   = sum(status == "Operational", na.rm = TRUE),
+    under_constr  = sum(status == "Under Construction", na.rm = TRUE),
+    planned       = sum(status == "Planned", na.rm = TRUE),
+    .groups = "drop"
+  )
+
+kable(summary_v5,
+      caption = "Final v5 dataset summary")
 ```
