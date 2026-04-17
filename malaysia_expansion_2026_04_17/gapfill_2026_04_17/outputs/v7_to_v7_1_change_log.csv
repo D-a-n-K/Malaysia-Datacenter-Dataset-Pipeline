@@ -1,0 +1,21 @@
+fix_number,change_type,v7_row_idx,v7_1_row_idx,description,outcome
+1,field_append,0,0,Absorbed source/note from v7_row_68 into v7_row_0 and cleared its sweep pointer,applied
+1,deletion,68,,Deleted duplicate AWS logical-region pin v7_row_68,applied
+2,rename,21,21,Renamed v7_row_21 from 'DayOne (Johor)' to 'DayOne Nusajaya Tech Park Campus' (kept both; flagged for user),flagged_for_user
+2,flag_added,33,33,Cross-ref flag on NTP1 row pointing to campus pin (v7_row_21),flagged_for_user
+3,coord_added,73,72,"Geocode failed; coords left blank, coord_confidence=unknown",skipped_missing_data
+3,rename,73,72,Renamed from 'NTT Cyberjaya Data Center (CBJ)' to 'NTT Cyberjaya CBJ1',applied
+3,row_update,73,72,Operator normalized from 'NTT DATA's Global Data Centers division' to 'NTT DATA'; address/source/note updated,applied
+3,flag_removed,73,72,Cleared NTT-specific pending_review flags (not_duplicate_per_dedup_5 + rename recommendation),applied
+4,flag_added,69,68,Flagged Google Selangor coord as likely Nominatim city-centroid artifact colliding with i-City cluster,flagged_for_user
+5,flag_added,127,126,Flagged Google/Gamuda Port Dickson coord-sharing ambiguity,flagged_for_user
+5,flag_added,128,127,Flagged Google/Gamuda Port Dickson coord-sharing ambiguity,flagged_for_user
+6,field_append,104,103,Documented shared-geocode status for racks_central member RCJM1,applied
+6,field_append,105,104,Documented shared-geocode status for racks_central member RCJM2A,applied
+6,field_append,106,105,Documented shared-geocode status for racks_central member RCJM2B,applied
+6,field_append,53,53,Documented shared-geocode status for ytl_johor member YTL Johor DC 1,applied
+6,field_append,54,54,Documented shared-geocode status for ytl_johor member YTL Johor DC 2,applied
+6,field_append,55,55,Documented shared-geocode status for ytl_johor member YTL Johor DC 3,applied
+6,field_append,33,33,Documented shared-geocode status for dayone_ntp member NTP1,applied
+6,field_append,34,34,Documented shared-geocode status for dayone_ntp member NTP2,applied
+6,field_append,35,35,Documented shared-geocode status for dayone_ntp member NTP3,applied

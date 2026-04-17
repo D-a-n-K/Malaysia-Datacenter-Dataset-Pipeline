@@ -1,0 +1,2 @@
+name,operator,lat,lon,sources,osm_id,wikidata_id,provider,region_code,facility_type,n_sources,ADMIN,ISO_A3,CONTINENT,SUBREGION,name_normalized,has_operator,in_both_sources,source_category,operator_norm,status,year,coord_confidence,cluster_id,address,source,note,osm_type,merge_status,matched_v5_name
+Cyberjaya,,2.9225,101.655,Wikipedia:Cyberjaya,,Q1147163,,,physical_facility,1,Malaysia,MYS,Asia,South-Eastern Asia,Cyberjaya,False,False,Wikipedia,,Unknown,,wikidata,,,wikipedia_pipeline,article_coord_template,,proximity_match,EdgeConneX Cyberjaya

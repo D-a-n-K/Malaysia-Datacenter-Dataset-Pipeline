@@ -1,0 +1,40 @@
+AIMS
+AWS
+AirTrunk
+Alibaba
+Area Group
+Azure
+Basis Bay
+Bridge Data Centres
+Bytedance
+DayOne
+Edge Centres
+EdgeConneX
+Empyrion Digital
+Equinix
+GCP
+GDS / DayOne
+Google
+Hitachi Sunway
+IRIX DC
+Infinaxis
+K2 Strategic
+Keppel Data Centres
+Microsoft
+NEXTDC
+NTT DATA
+Open DC
+Oracle
+PLTPro
+Princeton Digital Group
+STACK Infrastructure
+STT GDC
+STT GDC / Basis Bay
+Shinsei / Regal Orion
+Telekom Malaysia
+Telekom Malaysia / Nxera
+VADS (TM subsidiary)
+Vantage / Yondr
+Vantage Data Centers
+YTL Data Center Holdings
+YTL Power

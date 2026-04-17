@@ -1,0 +1,111 @@
+change_type,source_file,source_row_idx,v6_row_idx,v7_row_idx,description
+field_append,dedup_fixes,0,44,,merge_confirmed: folded v6_row_86 source/note into v6_row_44
+deletion,dedup_fixes,0,86,,merge_confirmed: dropped v6_row_86 (Keppel Data Centres | Keppel DC Johor 1)
+field_append,dedup_fixes,1,25,,merge_confirmed: folded v6_row_93 source/note into v6_row_25
+deletion,dedup_fixes,1,93,,merge_confirmed: dropped v6_row_93 (JH1)
+flag_added,dedup_fixes,2,53,,review_campus: flagged v6_row_53
+flag_added,dedup_fixes,2,54,,review_campus: flagged v6_row_54
+flag_added,dedup_fixes,2,55,,review_campus: flagged v6_row_55
+flag_added,dedup_fixes,3,9,,review: flagged v6_row_9
+flag_added,dedup_fixes,3,74,,review: flagged v6_row_74
+flag_added,dedup_fixes,4,74,,not_duplicate_keep_both: flagged v6_row_74
+flag_added,dedup_fixes,4,91,,not_duplicate_keep_both: flagged v6_row_91
+flag_added,dedup_fixes,5,11,,not_duplicate_keep_both: flagged v6_row_11
+flag_added,dedup_fixes,5,73,,not_duplicate_keep_both: flagged v6_row_73
+flag_added,special_case,,9,,AIMS three-way cross-reference flagged
+flag_added,special_case,,74,,AIMS three-way cross-reference flagged
+flag_added,special_case,,91,,AIMS three-way cross-reference flagged
+flag_added,special_case,,44,,Keppel coord-caveat flagged (operator does not publish street-level coord)
+flag_added,special_case,,73,,NTT CBJ rename + coord-fill recommendation flagged
+row_append,gapfill_candidates,0,,,add_new: Bridge Data Centres MY01 (Cyberjaya)
+skip,gapfill_candidates,1,,,skip: Bridge Data Centres MY02 (Cyberjaya) — skip:duplicate_of_CX5 / MY02 Cyberjaya Malaysia
+row_append,gapfill_candidates,2,,,add_new: Bridge Data Centres MY03 (Bukit Jalil)
+row_append,gapfill_candidates,3,,,add_new: VADS Iskandar Puteri Data Centre (IPDC)
+row_append,gapfill_candidates,4,,,add_new: VADS Klang Valley Data Centre (KVDC)
+row_append,gapfill_candidates,5,,,review appended: Maxis i-City Data Centre (Shah Alam) — review:cotenant_of_HDC High Performance Data Centre (Shah Alam)
+row_append,gapfill_candidates,6,,,add_new: Racks Central RCJM1 (Pasir Gudang)
+row_append,gapfill_candidates,7,,,add_new: Racks Central RCJM2A (Pasir Gudang)
+row_append,gapfill_candidates,8,,,add_new: Racks Central RCJM2B (Pasir Gudang)
+row_append,gapfill_candidates,9,,,add_new: MyTelehaus PJ3 Centre (Petaling Jaya)
+row_append,gapfill_candidates,10,,,add_new: MyTelehaus CJ1 (Petaling Jaya)
+row_append,gapfill_candidates,11,,,add_new: SILVERSTREAMS Data Centre (Bagan Datuk)
+row_append,gapfill_candidates,12,,,add_new: Exitra Data Center (Kuala Lumpur)
+row_append,gapfill_candidates,13,,,add_new: Progenet Data Center (Petaling Jaya)
+row_append,gapfill_candidates,14,,,add_new: Teliti Datacentre (Bandar Enstek)
+row_append,gapfill_candidates,15,,,add_new: SKALI Serdang Internet Data Center
+row_append,gapfill_candidates,16,,,add_new: HDC High Performance Data Centre (Shah Alam)
+row_append,gapfill_candidates,17,,,add_new: MaNaDr Bintulu AI Data Centre (planned)
+row_append,gapfill_candidates,18,,,add_new: TM Global BFDC (Brickfields) Data Centre
+row_append,gapfill_candidates,19,,,add_new: TM Global KJDC (Kelana Jaya) Data Centre
+row_append,gapfill_candidates,20,,,add_new: TM Global KVDC (Klang Valley Core) Data Centre
+row_append,gapfill_candidates,21,,,add_new: TM Global IPDC (Iskandar Puteri) Data Centre
+row_append,gapfill_candidates,22,,,hold appended: TM Global SJDC (Subterranean Penang) Data Centre — hold:needs_penang_address
+row_update,gapfill_candidates,23,12,,"update_existing:12: appended:name, appended:operator, appended:operator_norm, appended:lat, appended:lon, appended:v6_layer, appended:source_category, appended:n_sources, appended:physical_facility, appended:address, filled:source, filled:note, appended:coord_confidence, appended:status"
+row_append,gapfill_candidates,24,,,add_new: YTL Sentul Data Centre (Kuala Lumpur)
+row_append,gapfill_candidates,25,,,add_new: K2 Data Centres JHR1 (Sedenak Tech Park)
+row_append,gapfill_candidates,26,,,add_new: VADS Brickfields Data Centre
+skip,gapfill_candidates,27,,,reject (carried to v8 gap): VADS Semarak Data Centre — reject:sole_source_tos_blocked
+skip,gapfill_candidates,28,,,reject (carried to v8 gap): VADS Bayan Baru Data Centre (Penang) — reject:sole_source_tos_blocked
+row_append,gapfill_candidates,29,,,add_new: VADS Ipoh Data Centre (Perak)
+skip,gapfill_candidates,30,,,reject (carried to v8 gap): VADS Labuan Data Centre — reject:sole_source_tos_blocked
+row_append,gapfill_candidates,31,,,add_new: Bridge Data Centres IOI Banting Campus
+row_append,gapfill_candidates,32,,,add_new: Mah Sing DC Hub @ Southville City (Bangi)
+row_append,gapfill_candidates,33,,,add_new: Google Port Dickson Data Centre (planned)
+row_append,gapfill_candidates,34,,,add_new: Gamuda DC Springhill (Port Dickson)
+row_append,gapfill_candidates,35,,,add_new: ZDATA GP3 Gelang Patah (Computility Technology Sdn Bhd)
+row_append,gapfill_candidates,36,,,review appended: Exabytes Penang Suntech Cybercity — review:possible_dup_Open DC PE1 - Suntech Penang Cybercity
+row_append,gapfill_candidates,37,,,review appended: Exabytes International Data Center (Kuala Lumpur) — review:possible_dup_AIMS Bangunan AIMS / KL2 (Kuala Lumpur)
+row_append,gapfill_candidates,38,,,review appended: Exabytes CJ1 Data Centre (Cyberjaya) — review:possible_dup_Open DC CJ1 (Cyberjaya)
+row_append,gapfill_candidates,39,,,add_new: AWS Cyberjaya Data Centre (ap-southeast-5 AZ)
+skip,gapfill_candidates,40,,,reject (carried to v8 gap): AWS KUL Dengkil Site (ap-southeast-5 AZ) — reject:sole_source_tos_blocked
+skip,gapfill_candidates,41,,,reject (carried to v8 gap): AWS KUL Bukit Jalil Site (ap-southeast-5 AZ) — reject:sole_source_tos_blocked
+flag_added,final_sweep,,,0,sweep_cotenant_pair: v7_row_0 ↔ v7_row_2 @ 0m
+flag_added,final_sweep,,,0,sweep_potential_dup: v7_row_0 ↔ v7_row_68 @ 11m
+flag_added,final_sweep,,,2,sweep_cotenant_pair: v7_row_2 ↔ v7_row_68 @ 11m
+flag_added,final_sweep,,,6,sweep_cotenant_pair: v7_row_6 ↔ v7_row_42 @ 0m
+flag_added,final_sweep,,,6,sweep_cotenant_pair: v7_row_6 ↔ v7_row_46 @ 24m
+flag_added,final_sweep,,,6,sweep_cotenant_pair: v7_row_6 ↔ v7_row_62 @ 27m
+flag_added,final_sweep,,,8,sweep_cotenant_pair: v7_row_8 ↔ v7_row_131 @ 43m
+flag_added,final_sweep,,,14,sweep_cotenant_pair: v7_row_14 ↔ v7_row_34 @ 144m
+flag_added,final_sweep,,,17,sweep_cotenant_pair: v7_row_17 ↔ v7_row_23 @ 0m
+flag_added,final_sweep,,,19,sweep_cotenant_pair: v7_row_19 ↔ v7_row_31 @ 77m
+flag_added,final_sweep,,,19,sweep_cotenant_pair: v7_row_19 ↔ v7_row_43 @ 47m
+flag_added,final_sweep,,,19,sweep_cotenant_pair: v7_row_19 ↔ v7_row_59 @ 46m
+flag_added,final_sweep,,,19,sweep_cotenant_pair: v7_row_19 ↔ v7_row_132 @ 54m
+flag_added,final_sweep,,,21,sweep_cotenant_pair: v7_row_21 ↔ v7_row_28 @ 0m
+flag_added,final_sweep,,,21,sweep_cotenant_pair: v7_row_21 ↔ v7_row_33 @ 0m
+flag_added,final_sweep,,,21,sweep_cotenant_pair: v7_row_21 ↔ v7_row_34 @ 111m
+flag_added,final_sweep,,,22,sweep_cotenant_pair: v7_row_22 ↔ v7_row_37 @ 0m
+flag_added,final_sweep,,,28,sweep_cotenant_pair: v7_row_28 ↔ v7_row_33 @ 0m
+flag_added,final_sweep,,,28,sweep_cotenant_pair: v7_row_28 ↔ v7_row_34 @ 111m
+flag_added,final_sweep,,,31,sweep_cotenant_pair: v7_row_31 ↔ v7_row_43 @ 89m
+flag_added,final_sweep,,,31,sweep_cotenant_pair: v7_row_31 ↔ v7_row_51 @ 142m
+flag_added,final_sweep,,,31,sweep_cotenant_pair: v7_row_31 ↔ v7_row_59 @ 89m
+flag_added,final_sweep,,,31,sweep_cotenant_pair: v7_row_31 ↔ v7_row_132 @ 42m
+flag_added,final_sweep,,,33,sweep_potential_dup: v7_row_33 ↔ v7_row_34 @ 111m
+flag_added,final_sweep,,,34,sweep_potential_dup: v7_row_34 ↔ v7_row_35 @ 111m
+flag_added,final_sweep,,,38,sweep_cotenant_pair: v7_row_38 ↔ v7_row_50 @ 0m
+flag_added,final_sweep,,,42,sweep_cotenant_pair: v7_row_42 ↔ v7_row_46 @ 24m
+flag_added,final_sweep,,,42,sweep_cotenant_pair: v7_row_42 ↔ v7_row_62 @ 27m
+flag_added,final_sweep,,,43,sweep_cotenant_pair: v7_row_43 ↔ v7_row_51 @ 146m
+flag_added,final_sweep,,,43,sweep_cotenant_pair: v7_row_43 ↔ v7_row_59 @ 1m
+flag_added,final_sweep,,,43,sweep_cotenant_pair: v7_row_43 ↔ v7_row_132 @ 48m
+flag_added,final_sweep,,,46,sweep_cotenant_pair: v7_row_46 ↔ v7_row_62 @ 5m
+flag_added,final_sweep,,,49,sweep_cotenant_pair: v7_row_49 ↔ v7_row_53 @ 0m
+flag_added,final_sweep,,,49,sweep_cotenant_pair: v7_row_49 ↔ v7_row_54 @ 111m
+flag_added,final_sweep,,,51,sweep_cotenant_pair: v7_row_51 ↔ v7_row_59 @ 147m
+flag_added,final_sweep,,,51,sweep_cotenant_pair: v7_row_51 ↔ v7_row_132 @ 129m
+flag_added,final_sweep,,,53,sweep_potential_dup: v7_row_53 ↔ v7_row_54 @ 111m
+flag_added,final_sweep,,,54,sweep_potential_dup: v7_row_54 ↔ v7_row_55 @ 111m
+flag_added,final_sweep,,,59,sweep_cotenant_pair: v7_row_59 ↔ v7_row_132 @ 48m
+flag_added,final_sweep,,,69,sweep_cotenant_pair: v7_row_69 ↔ v7_row_103 @ 30m
+flag_added,final_sweep,,,69,sweep_cotenant_pair: v7_row_69 ↔ v7_row_114 @ 30m
+flag_added,final_sweep,,,91,sweep_cotenant_pair: v7_row_91 ↔ v7_row_130 @ 46m
+flag_added,final_sweep,,,101,sweep_cotenant_pair: v7_row_101 ↔ v7_row_119 @ 0m
+flag_added,final_sweep,,,102,sweep_cotenant_pair: v7_row_102 ↔ v7_row_118 @ 0m
+flag_added,final_sweep,,,103,sweep_cotenant_pair: v7_row_103 ↔ v7_row_114 @ 0m
+flag_added,final_sweep,,,104,sweep_potential_dup: v7_row_104 ↔ v7_row_105 @ 0m
+flag_added,final_sweep,,,104,sweep_potential_dup: v7_row_104 ↔ v7_row_106 @ 0m
+flag_added,final_sweep,,,105,sweep_potential_dup: v7_row_105 ↔ v7_row_106 @ 0m
+flag_added,final_sweep,,,116,sweep_cotenant_pair: v7_row_116 ↔ v7_row_123 @ 0m
+flag_added,final_sweep,,,127,sweep_cotenant_pair: v7_row_127 ↔ v7_row_128 @ 0m

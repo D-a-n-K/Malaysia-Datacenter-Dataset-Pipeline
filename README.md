@@ -34,14 +34,38 @@ The source layers, their access methods, and their licenses are as follows:
 
 The most analytically significant finding is the systematic divergence between open geospatial data and the actual landscape of Malaysian datacenter infrastructure. OSM captures community-mapped colocation facilities and satellite-traced building footprints but lacks operator attribution for 100% of its entries; Wikidata's structured datacenter coverage in Southeast Asia is effectively zero; cloud provider APIs capture the hyperscale layer but at region-level granularity rather than facility-level; and trade press is the only source that identifies the colocation operators (Bridge Data Centres, AirTrunk, DayOne, NTT, EdgeConneX, Vantage) that collectively account for the majority of Malaysia's built IT capacity. No single source is sufficient. The multi-source reconciliation approach is the contribution.
 
+## Expansion (April 2026): v4 → v7.1
+
+The v3 dataset grew from 50 to 133 facilities through a series of targeted expansion, correction, and consolidation passes. Each pass is reproducible from cached HTTP responses and logged decisions.
+
+**v4 / v5 / v5.1 — operator-tier scoring and postprocessing.** v4 added explicit operator-tier classification (`hyperscale`, `tier1_colo`, `tier2_colo`, `cloud_region`, etc.) and per-row confidence scores; v5 extended the dataset to the `datacenter-malaysia-v4.qmd` Quarto document. v5.1 was a postprocessing pass that reconciled duplicate entries, normalized operator names, and produced `malaysia_datacenters_v5_1.csv` as the merge baseline for v6.
+
+**v6 — open-source expansion with five new scrapers.** After Data Center Map's terms of service were found to prohibit database integration, the v6 sprint added five scrapers targeting openly-licensed or publicly-disclosed sources: `peeringdb_scraper.py` (PeeringDB facility API), `mida_scraper.py` (MIDA press-release corpus), `st_scraper.py` (Suruhanjaya Tenaga licensee filings), `mdec_dnb_scraper.py` (MDEC Digital Nusantara Berhad records), and `operator_ir_scraper.py` (operator investor-relations pages, ~40 operators). All scrapers use stdlib-only HTTP (no third-party libraries), a 1-second inter-request delay, URL-hash file cache, and a descriptive research User-Agent. `merge_v6.py` consolidated the five candidate files with the v5.1 baseline into `malaysia_datacenters_v6_master.csv` (101 rows × 38 columns), stratified into three confidence layers (`v6_high_confidence.csv`, `v6_medium_confidence.csv`, `v6_needs_review.csv`).
+
+**Gapfill sprint (2026-04-17) — v6 candidates + corrections + dedup.** A focused gapfill pass emitted 42 candidate rows (`v6_gapfill_candidates.csv`) with each row carrying a `promotion_action` (`add_new`, `update_existing:<idx>`, `review:*`, `hold:*`, `skip:*`, or `reject:*`). A separate dedup pass produced 6 decisions (`v6_dedup_fixes.csv`) covering suspected duplicates. `build_dedup_fixes.py`, `emit_candidates.py`, `apply_corrections.py`, and `build_report.py` implement the pipeline.
+
+**Dedup resolution pass — 4 pending-verification entries resolved via operator sources.** Four dedup decisions that had been downgraded to `merge_pending_verification` (no independent coordinate corroboration in cache) were resolved by fetching operator-direct pages: Keppel DC Johor 1 (keppeldatacentres.com confirmed facility identity), Princeton Digital JH1 (princetondg.com confirmed Sedenak Tech Park location, invalidating a 15 km-drifted PeeringDB coord), AIMS CJ1 vs. AIMS Cyberjaya (reversed to `not_duplicate_keep_both` — PeeringDB records have distinct Cyberjaya zone addresses), and NTT CBJ vs. CBJ6 (resolved to `not_duplicate_keep_both` — NTT's newsroom confirms a multi-building numbered campus where CBJ is historical shorthand for the original CBJ1 building).
+
+**v7 master — 134 rows.** `build_v7.py` applied all finalized decisions to produce `malaysia_datacenters_v7_master.csv`, adding three audit columns (`v7_status`, `v7_pending_review`, `v7_change_log`) without altering the 38 inherited columns. A final dedup sweep surfaced 8 potential same-operator duplicates and 42 cotenancy pairs as `pending_review` flags rather than auto-merging.
+
+**v7.1 — 6 targeted fixes → 133 rows.** `build_v7_1.py` applied a narrow correction pass: an AWS double-pin merger, a DayOne/GDS naming collision flag (kept both, building-level granularity preserved), NTT CBJ renamed to CBJ1 with source corroboration added, a Google/i-City geocoder-artifact flag, a Google/Gamuda Port Dickson ambiguity flag, and documentation of shared-geocode status for the Racks Central, YTL Johor, and DayOne NTP cluster phases. One deletion (the duplicate AWS pin); all other fixes were documentation-only or flag-only.
+
+**Known gaps carried to v8.** Five facilities with sole-source TOS-blocked provenance (VADS Semarak, VADS Bayan Baru, VADS Labuan, AWS KUL Dengkil, AWS KUL Bukit Jalil) are listed in the v7 build report for a future SSM/MCMC/planning-portal resolution pass. The NTT CBJ1 coordinate remains blank — Nominatim has no entry for "Jalan APEC, Cyberjaya" under any of five query variants tried.
+
 ## Repository Contents
 
 | File | Description |
 |------|-------------|
-| `datacenter-malaysia-v3.qmd` | Complete Quarto pipeline, renders to PDF |
-| `datacenter-malaysia-v3.pdf` | Rendered output (41 pages) |
-| `outputs/malaysia_datacenters_v3.csv` | Final dataset (50 rows) |
-| `outputs/malaysia_datacenters_v3.rds` | R-native serialized dataset |
+| `datacenter-malaysia-v3.qmd` / `.pdf` | Original v3 pipeline (50 facilities) |
+| `datacenter-malaysia-v4.qmd` / `.pdf` | v4 pipeline with operator-tier scoring |
+| `outputs/malaysia_datacenters_v3.csv` | v3 dataset (50 rows) |
+| `malaysia_expansion_2026_04_17/` | v5–v7.1 expansion pipeline and outputs |
+| `malaysia_expansion_2026_04_17/outputs/malaysia_datacenters_v6_master.csv` | v6 master (101 rows × 38 cols) |
+| `malaysia_expansion_2026_04_17/gapfill_2026_04_17/outputs/malaysia_datacenters_v7_master.csv` | v7 master (134 rows × 41 cols) |
+| `malaysia_expansion_2026_04_17/gapfill_2026_04_17/outputs/malaysia_datacenters_v7_1_master.csv` | v7.1 master (133 rows × 41 cols) |
+| `malaysia_expansion_2026_04_17/gapfill_2026_04_17/outputs/v6_dedup_resolution_report.md` | Dedup pending-verification resolution report |
+| `malaysia_expansion_2026_04_17/gapfill_2026_04_17/outputs/v7_build_report.md` | v6 → v7 build report |
+| `malaysia_expansion_2026_04_17/gapfill_2026_04_17/outputs/v7_to_v7_1_fix_report.md` | v7 → v7.1 fix-pass report |
 | `outputs/overpass_malaysia_raw.json` | Cached Overpass API response |
 
 ## Requirements

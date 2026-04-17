@@ -1,0 +1,18 @@
+pdb_id,pdb_name,pdb_url,pdb_lat,pdb_lon,v5_name,merge_status,merge_distance_m
+460,AIMS Kuala Lumpur,https://www.peeringdb.com/fac/460,3.14969,101.70634,AIMS Bangunan AIMS / KL2 (Kuala Lumpur),duplicate_proximity,47.8
+1279,CSF CX1 / TelcoHub1 Kuala Lumpur,https://www.peeringdb.com/fac/1279,2.913224,101.655646,VADS CBJ5 (Cyberjaya),duplicate_proximity,31.4
+1514,CX2 / MY01 Cyberjaya Malaysia,https://www.peeringdb.com/fac/1514,2.917133,101.66188,Bridge Data Centres MY02 (Cyberjaya),duplicate_proximity,3.6
+1537,CJ1 CYBERJAYA,https://www.peeringdb.com/fac/1537,2.904188,101.651988,Vantage Cyberjaya Campus 2,duplicate_proximity,43.0
+4639,PLTPRO Data Centre,https://www.peeringdb.com/fac/4639,2.917314,101.66188,Bridge Data Centres MY02 (Cyberjaya),duplicate_proximity,18.0
+5582,Open DC JB1 - Menara MSC Cyberport,https://www.peeringdb.com/fac/5582,1.462955,103.771729,Open DC JB1 (Johor Bahru),duplicate_proximity,20.7
+5643,"TM ONE IPDC, Johore",https://www.peeringdb.com/fac/5643,1.435272,103.598682,Telekom Malaysia IPDC (Iskandar Puteri),duplicate_proximity,45.8
+5771,"TM ONE CBJ1, Cyberjaya",https://www.peeringdb.com/fac/5771,2.930382,101.656849,Telekom Malaysia KVDC (Cyberjaya),duplicate_proximity,191.8
+5773,"TM ONE CBJ5, Cyberjaya",https://www.peeringdb.com/fac/5773,2.913224,101.655646,VADS CBJ5 (Cyberjaya),duplicate_proximity,31.4
+5774,"TM ONE CBJ6, Cyberjaya",https://www.peeringdb.com/fac/5774,2.917144,101.661891,Bridge Data Centres MY02 (Cyberjaya),duplicate_proximity,1.9
+9758,Keppel Data Centres | Basis Bay Data Centre,https://www.peeringdb.com/fac/9758,2.905236,101.652832,Vantage Cyberjaya Campus 2,duplicate_proximity,182.0
+12104,Myklnet Selangor,https://www.peeringdb.com/fac/12104,2.904116,101.651735,Vantage Cyberjaya Campus 2,duplicate_proximity,15.3
+14882,STT Kuala Lumpur 1,https://www.peeringdb.com/fac/14882,2.905889,101.651324,Vantage Cyberjaya Campus 2,duplicate_proximity,195.5
+14959,Equinix KL1 - Kuala Lumpur,https://www.peeringdb.com/fac/14959,2.904539,101.651829,Vantage Cyberjaya Campus 2,duplicate_proximity,49.7
+14960,Equinix JH1 - Johor,https://www.peeringdb.com/fac/14960,1.432164,103.599009,AirTrunk JHB2 (Johor),duplicate_proximity,264.6
+15719,MY06,https://www.peeringdb.com/fac/15719,1.700833,103.4125,Unnamed facility (OSM way 1432337903),duplicate_proximity,260.9
+16213,AIMS Kuala Lumpur 2,https://www.peeringdb.com/fac/16213,3.149553,101.705273,AIMS Bangunan AIMS / KL2 (Kuala Lumpur),duplicate_proximity,91.6
