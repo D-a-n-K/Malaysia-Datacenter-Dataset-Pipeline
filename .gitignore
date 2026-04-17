@@ -1,1 +1,3 @@
 .Renviron
+__pycache__/
+cache/
