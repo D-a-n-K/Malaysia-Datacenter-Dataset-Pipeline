@@ -1780,6 +1780,7 @@ summary_v4 <- final_v3 %>%
 kable(summary_v4,
       caption = "Final v4 dataset summary by source category and facility type")
 ```
+
 # Part 11: Manual Curation from Public Sources
 
 The NER pipeline in Part 10 demonstrated the text-analytics methodology but
@@ -1804,66 +1805,74 @@ Regal Orion, Microsoft physical sites, and YTL individual buildings.
 
 library(ggmap)
 
+if (Sys.getenv("GOOGLE_API_KEY") != "") {
+  register_google(key = Sys.getenv("GOOGLE_API_KEY"))
+  has_geocoder <- TRUE
+} else {
+  has_geocoder <- FALSE
+  cat("No Google API key found; using city-level fallback coordinates\n")
+}
+
+# Multi-building campus offset convention:
+# When multiple buildings share the same campus and will geocode to
+# identical coordinates, apply small lat offsets (0.001 degrees ~ 111m)
+# to prevent dedup collapse. This is the same approach used for cloud
+# providers in Part 4 and is documented here for replicability.
+
 curated_facilities <- tibble(
   name = c(
-    # Equinix
+    # Equinix (2 facilities)
     "Equinix KL1 (Cyberjaya)",
     "Equinix JH1 (Iskandar Puteri, Johor)",
-    # GDS / DayOne
+    # GDS / DayOne (4 facilities — NTP1/2/3 share a campus, offset applied)
     "GDS Nusajaya NTP1 (Johor)",
     "GDS Nusajaya NTP2 (Johor)",
     "GDS Nusajaya NTP3 (Johor)",
     "GDS Kempas Lama (Johor)",
-    # STT GDC
+    # STT GDC (2 facilities)
     "STT Cyberjaya DC.2",
     "STT Johor 1 (Nusa Cemerlang)",
-    # VADS / Telekom Malaysia
+    # VADS / Telekom Malaysia (6 facilities — CBJ7 removed per audit, not verifiable)
     "VADS CBJ1 (Cyberjaya)",
     "VADS CBJ2 (Cyberjaya)",
     "VADS CBJ5 (Cyberjaya)",
     "VADS CBJ6 (Cyberjaya)",
-    "VADS CBJ7 (Cyberjaya)",
     "VADS CBJ8 (Cyberjaya)",
-    # Keppel
-    "Keppel DC Johor 1 (Iskandar Puteri)",
-    # STACK
+    # Keppel (1 facility)
+    "Keppel DC Johor 1 (Kulai)",
+    # STACK (1 facility)
     "STACK JHB01 (Johor Bahru)",
-    # Hitachi Sunway
+    # Hitachi Sunway (2 facilities — CX2/Jalan Impact collapsed into one per audit)
     "Hitachi Sunway DC CX2 (Cyberjaya)",
-    "Hitachi Sunway DC Jalan Impact (Cyberjaya)",
     "Hitachi Sunway DC Century Square (Cyberjaya)",
-    # NEXTDC
+    # NEXTDC (1 facility)
     "NEXTDC KL1 (Kuala Lumpur)",
-    # Microsoft physical sites
+    # Microsoft physical sites (2 facilities)
     "Microsoft Kulai (Johor)",
     "Microsoft Nusa Cemerlang (Johor)",
-    # Vantage (missing from v4)
+    # Vantage campuses (2 facilities)
     "Vantage KUL1 Campus (Cyberjaya)",
     "Vantage KUL2 Campus (Cyberjaya)",
-    # YTL individual buildings
+    # YTL individual buildings (3 — campus offsets applied)
     "YTL Johor Data Center 1 (Kulai)",
     "YTL Johor Data Center 2 (Kulai)",
     "YTL Johor Data Center 3 (Kulai)",
-    # Basis Bay
+    # Basis Bay (2 facilities)
     "Basis Bay Glenmarie (Shah Alam)",
     "Basis Bay Cyberjaya",
-    # Princeton Digital (specific campus)
+    # Princeton Digital (1 facility)
     "Princeton Digital JH1 Campus (Sedenak)",
-    # Regal Orion
-    "Regal Orion Labu (Negeri Sembilan)",
-    # Open DC (missing Cyberjaya site)
+    # Shinsei Malaysia 1 (formerly listed as Regal Orion — corrected per audit)
+    "Shinsei Malaysia 1 (Labu, Negeri Sembilan)",
+    # Open DC (2 facilities)
     "Open DC CJ1 (Cyberjaya)",
     "Open DC JB1 (Johor Bahru)",
-    # MN Holdings / Shanghai DC-Science
-    "MN Holdings DC (Johor)",
-    # Infinaxis
+    # Infinaxis (1 facility)
     "Infinaxis Cyberjaya 1",
-    # PLTPro
+    # PLTPro (1 facility)
     "PLTPro CX2 (Cyberjaya)",
-    # Edge Centres
-    "Edge Centres EC31 (Kuala Lumpur)",
-    # Telstra
-    "Telstra Cyberjaya Teleport"
+    # Edge Centres (1 facility — location corrected to Shah Alam, status to Operational 2022)
+    "Edge Centres EC31 (Shah Alam)"
   ),
   operator = c(
     "Equinix", "Equinix",
@@ -1871,10 +1880,10 @@ curated_facilities <- tibble(
     "STT GDC / Basis Bay", "STT GDC",
     "VADS (TM subsidiary)", "VADS (TM subsidiary)",
     "VADS (TM subsidiary)", "VADS (TM subsidiary)",
-    "VADS (TM subsidiary)", "VADS (TM subsidiary)",
+    "VADS (TM subsidiary)",
     "Keppel Data Centres",
     "STACK Infrastructure",
-    "Hitachi Sunway", "Hitachi Sunway", "Hitachi Sunway",
+    "Hitachi Sunway", "Hitachi Sunway",
     "NEXTDC",
     "Microsoft", "Microsoft",
     "Vantage Data Centers", "Vantage Data Centers",
@@ -1882,104 +1891,111 @@ curated_facilities <- tibble(
     "YTL Data Center Holdings",
     "Basis Bay", "Basis Bay",
     "Princeton Digital Group",
-    "Regal Orion",
+    "Shinsei / Regal Orion",
     "Open DC", "Open DC",
-    "MN Holdings / Shanghai DC-Science",
     "Infinaxis",
     "PLTPro",
-    "Edge Centres",
-    "Telstra International"
+    "Edge Centres"
   ),
   geocode_query = c(
-    "Equinix KL1 Jalan Cyber Point 4 Cyberjaya Malaysia",
+    # Equinix — use street addresses from operator pages
+    "Equinix KL1 No 2 Jalan Cyber Point 4 Cyber 8 Cyberjaya Malaysia",
     "Equinix JH1 Nusajaya Tech Park Iskandar Puteri Johor Malaysia",
+    # GDS — Nusajaya Tech Park campus
     "GDS Nusajaya Tech Park data center Johor Malaysia",
     "GDS Nusajaya Tech Park data center Johor Malaysia",
     "GDS Nusajaya Tech Park data center Johor Malaysia",
     "GDS Kempas Lama data center Johor Malaysia",
-    "STT GDC Cyberjaya data center Malaysia",
+    # STT GDC
+    "STT GDC Cyberjaya data center Multimedia Super Corridor Malaysia",
     "Nusa Cemerlang Industrial Park Iskandar Puteri Johor Malaysia",
-    "VADS Cyberjaya Lingkaran Usahawan Malaysia",
-    "VADS Cyberjaya Bangunan TM Malaysia",
-    "VADS CBJ5 Jalan Teknokrat 6 Cyberjaya Malaysia",
-    "VADS CBJ6 CX2 Jalan Impact Cyberjaya Malaysia",
-    "VADS CBJ7 Cyberjaya Malaysia",
-    "VADS CBJ8 MyTelehaus CJ1 Jalan Cyber Point 4 Cyberjaya Malaysia",
-    "Keppel DC Johor 1 Iskandar Puteri Malaysia",
-    "STACK Infrastructure Johor Bahru Malaysia",
-    "Hitachi Sunway CX2 Jalan Impact Cyberjaya Malaysia",
-    "Hitachi Sunway Jalan Impact Cyberjaya Malaysia",
-    "Hitachi Sunway Century Square Cyberjaya Malaysia",
-    "NEXTDC KL1 Kuala Lumpur Malaysia",
+    # VADS — use specific addresses from datacentermap snippets
+    "VADS CBJ1 Lingkaran Usahawan 1 Timur Cyberjaya Malaysia",
+    "VADS Bangunan TM CBJ Unit 2 Jalan Lingkaran Fauna Cyberjaya Malaysia",
+    "VADS CBJ5 CSF Computer Exchange 3552 Jalan Teknokrat 6 Cyberjaya Malaysia",
+    "VADS CBJ6 CX2 Computer Exchange 7118 Jalan Impact Cyberjaya Malaysia",
+    "VADS CBJ8 MyTelehaus CJ1 Centre No 1 Jalan Cyber Point 4 Cyberjaya Malaysia",
+    # Keppel — use XLSX-verified location in Kulai area
+    "Keppel DC Johor 1 Kulai Johor Malaysia",
+    # STACK — use street from datacentermap, NOT AirTrunk's address
+    "STACK Infrastructure Jalan Bioteknologi Johor Bahru Malaysia",
+    # Hitachi Sunway — one entry with full address, second at different building
+    "Hitachi Sunway 7118 CX2 Computer Exchange Jalan Impact Cyberjaya Malaysia",
+    "Hitachi Sunway Block 2310 Jalan Usahawan Century Square Cyberjaya Malaysia",
+    # NEXTDC
+    "NEXTDC KL1 data center Kuala Lumpur Malaysia",
+    # Microsoft — use specific town names
     "Microsoft data center Kulai Johor Malaysia",
-    "Microsoft data center Nusa Cemerlang Johor Malaysia",
+    "Microsoft data center Nusa Cemerlang Iskandar Puteri Johor Malaysia",
+    # Vantage — use Persiaran APEC address from operator website
     "Vantage KUL1 Persiaran APEC Cyberjaya Malaysia",
-    "Vantage KUL2 Cyberjaya Malaysia",
+    "Vantage KUL2 Cyberjaya Selangor Malaysia",
+    # YTL — same campus, geocode once and offset
     "YTL Green Data Center Park Kulai Johor Malaysia",
     "YTL Green Data Center Park Kulai Johor Malaysia",
     "YTL Green Data Center Park Kulai Johor Malaysia",
-    "Basis Bay data center Glenmarie Shah Alam Malaysia",
-    "Basis Bay data center Cyberjaya Malaysia",
-    "Princeton Digital JH1 Sedenak Tech Park Johor Malaysia",
-    "Regal Orion data center Labu Negeri Sembilan Malaysia",
-    "Open DC CJ1 Jalan Cyber Point 4 Cyberjaya Malaysia",
-    "Open DC Menara MSC Cyberport Johor Bahru Malaysia",
-    "MN Holdings data center Johor Malaysia",
-    "Infinaxis Cyberjaya Malaysia",
-    "PLTPro CX2 Computer Exchange Cyberjaya Malaysia",
-    "Edge Centres EC31 Kuala Lumpur Malaysia",
-    "Telstra Cyberjaya teleport Malaysia"
+    # Basis Bay — distinct locations, specific queries
+    "Basis Bay Glenmarie data center Shah Alam Selangor Malaysia",
+    "Basis Bay data center Cyberjaya Selangor Malaysia",
+    # Princeton Digital
+    "Princeton Digital Group JH1 Sedenak Tech Park Kulai Johor Malaysia",
+    # Shinsei / Regal Orion
+    "Shinsei Malaysia data center Labu Negeri Sembilan Malaysia",
+    # Open DC
+    "Open DC CJ1 Jalan Cyber Point 4 Cyber 8 Cyberjaya Malaysia",
+    "Open DC Menara MSC Cyberport Jalan Bukit Meldrum Johor Bahru Malaysia",
+    # Infinaxis
+    "Infinaxis data center Multimedia Super Corridor Cyberjaya Malaysia",
+    # PLTPro
+    "PLTPro CX2 Computer Exchange Jalan Impact Cyberjaya Malaysia",
+    # Edge Centres — corrected to Shah Alam per audit
+    "Edge Centres EC31 Jalan Pengaturcara U1/51 Temasya Shah Alam Malaysia"
   ),
   source = "Manual Curation (public sources)",
   note = c(
-    "900 cabinets, 2630 sqm; Jalan Cyber Point 4; opened 2024; Equinix press release",
+    "900 cabinets, 2630 sqm; No 2 Jalan Cyber Point 4; opened 2024; Equinix press release",
     "500 cabinets, 1800 sqm; Nusajaya Tech Park NTP; $40M investment; opened 2024; Equinix blog",
-    "Phase 1; 69.5MW total across NTP1-3; Nusajaya Tech Park; launched 2023; GDS press release",
-    "Phase 1; part of 69.5MW NTP campus; Nusajaya Tech Park; GDS press release",
-    "Phase 1; part of 69.5MW NTP campus; Nusajaya Tech Park; GDS press release",
+    "Phase 1 building; 69.5MW total across NTP1-3; Nusajaya Tech Park; launched 2023; GDS press release",
+    "Phase 1 building; part of 69.5MW NTP campus; Nusajaya Tech Park; campus offset +0.001 lat; GDS press release",
+    "Phase 1 building; part of 69.5MW NTP campus; Nusajaya Tech Park; campus offset +0.002 lat; GDS press release",
     "New campus; Kempas Lama, Johor; Baxtel",
-    "JV with Basis Bay; ~20MW across 2 buildings; LEED Gold target; STT GDC press release",
-    "16MW first building; 22 acres, 120MW total campus; Nusa Cemerlang; groundbreaking Feb 2025; DCD",
-    "Lingkaran Usahawan 1 Timur; Tier 3; datacentermap.com search snippet",
+    "JV with Basis Bay; ~20MW across 2 buildings; LEED Gold target; STT GDC press release Nov 2023",
+    "16MW first building; 22 acres, 120MW total campus; Nusa Cemerlang Industrial Park; groundbreaking Feb 2025; DCD",
+    "Lingkaran Usahawan 1 Timur; Tier 3; ISO 27001; datacentermap.com snippet",
     "Bangunan TM CBJ Unit 2, Jalan Lingkaran Fauna; datacentermap.com snippet",
-    "CSF Computer Exchange, 3552 Jalan Teknokrat 6; datacentermap.com snippet",
-    "CX2 Computer Exchange, 7118 Jalan Impact; datacentermap.com snippet",
-    "Cyberjaya; VADS Berhad; datacentermap.com",
-    "MyTelehaus CJ1 Centre, Jalan Cyber Point 4; datacentercatalog.com",
-    "BTS for Microsoft Azure; Iskandar Puteri; Keppel-controlled; Dgtl Infra",
-    "10.8 hectares; cloud and AI/ML workloads; datacentermap.com snippet",
-    "CX2 Computer Exchange, 7118 Jalan Impact; datacentermap.com snippet",
-    "Jalan Impact (formerly Jalan Teknologi 1); datacentermap.com snippet",
+    "CSF Computer Exchange, 3552 Jalan Teknokrat 6, 3rd Floor; datacentermap.com snippet",
+    "CX2 Computer Exchange, 7118 Jalan Impact, 4th Floor; datacentermap.com snippet",
+    "MyTelehaus CJ1 Centre, No 1 Jalan Cyber Point 4, Level 3; datacentercatalog.com",
+    "BTS for Microsoft Azure; Kulai area; Keppel-controlled; coords from XLSX (1.6686, 103.5224); Dgtl Infra",
+    "10.8 hectares; cloud and AI/ML workloads; Jalan Bioteknologi; datacentermap.com snippet",
+    "7118 CX2 Computer Exchange, Jalan Impact; includes former Jalan Teknologi 1 site; datacentermap.com snippet",
     "Block 2310, Jalan Usahawan, Century Square; datacentermap.com snippet",
     "65MW colocation; announced; GlobeNewswire / Arizton report",
     "Part of Azure Malaysia region; Kulai, Johor; XLSX reference",
-    "Part of Azure Malaysia region; Nusa Cemerlang; XLSX reference",
-    "31MW; 4 multi-story buildings; Persiaran APEC; Vantage website",
-    "436MW planned; 52 acres; adjacent to KUL1; Vantage website",
+    "Part of Azure Malaysia region; Nusa Cemerlang, Iskandar Puteri; XLSX reference",
+    "31MW; 4 multi-story buildings; Persiaran APEC; WUE near zero; Vantage website",
+    "436MW planned; 52 acres; adjacent to KUL1; 10 structures; Vantage website",
     "Part of 275-acre YTL Green Data Center Park; Kulai; FULCRUM analysis",
-    "Part of 275-acre YTL Green Data Center Park; Kulai; FULCRUM analysis",
-    "Part of 275-acre YTL Green Data Center Park; Kulai; FULCRUM analysis",
-    "One of Malaysia's first carrier-neutral DCs; 27+ years; STT GDC JV announcement",
+    "Part of 275-acre YTL Green Data Center Park; Kulai; campus offset +0.001 lat; FULCRUM analysis",
+    "Part of 275-acre YTL Green Data Center Park; Kulai; campus offset +0.002 lat; FULCRUM analysis",
+    "Glenmarie, Shah Alam; one of Malaysia's first carrier-neutral DCs; 27+ years; STT GDC JV announcement",
     "Cyberjaya facility; Basis Bay; STT GDC JV announcement",
-    "700-acre campus; Sedenak Tech Park; hyperscaler-focused; datacentermap.com snippet",
-    "Labu, Negeri Sembilan; local provider; Dgtl Infra mention",
+    "700-acre Sedenak Tech Park campus; hyperscaler-focused; datacentermap.com snippet",
+    "Labu, Negeri Sembilan; also known as Regal Orion; single facility; datacentermap.com",
     "Jalan Cyber Point 4, Cyber 8; Cyberjaya; datacentermap.com",
-    "Menara MSC Cyberport, Jalan Bukit Meldrum; Johor Bahru; datacentermap.com",
-    "US$600M facility; JV with Shanghai DC-Science; FULCRUM analysis",
+    "Menara MSC Cyberport, No 5 Jalan Bukit Meldrum; Johor Bahru; datacentermap.com",
     "Multimedia Super Corridor; Tier III target; datacentermap.com snippet",
-    "CX2 Computer Exchange; Cyberjaya; datacentermap.com snippet",
-    "First Asian facility; Kuala Lumpur; announced 2024; Baxtel",
-    "Satellite teleport + DC; Cyberjaya; partnered with local operator; Mordor Intelligence"
+    "CX2 Computer Exchange, West Wing; Cyberjaya; datacentermap.com snippet",
+    "Jalan Pengaturcara U1/51 Temasya Shah Alam; launched 2022; DCD; corrected from v5 audit"
   ),
   status = c(
     "Operational", "Operational",
     "Operational", "Operational", "Operational", "Under Construction",
     "Under Construction", "Under Construction",
-    "Operational", "Operational", "Operational", "Operational",
-    "Operational", "Operational",
+    "Operational", "Operational", "Operational", "Operational", "Operational",
     "Operational",
     "Under Construction",
-    "Operational", "Operational", "Operational",
+    "Operational", "Operational",
     "Planned",
     "Under Construction", "Under Construction",
     "Operational", "Under Construction",
@@ -1988,19 +2004,15 @@ curated_facilities <- tibble(
     "Operational",
     "Operational",
     "Operational", "Operational",
-    "Under Construction",
     "Operational",
     "Operational",
-    "Planned",
     "Operational"
   ),
   facility_type = "physical_facility"
 )
 
-# Geocode if API key is available
-if (Sys.getenv("GOOGLE_API_KEY") != "") {
-  register_google(key = Sys.getenv("GOOGLE_API_KEY"))
-
+# Geocode
+if (has_geocoder) {
   cat("Geocoding", nrow(curated_facilities), "curated facilities...\n")
 
   curated_facilities <- curated_facilities %>%
@@ -2020,18 +2032,48 @@ if (Sys.getenv("GOOGLE_API_KEY") != "") {
                                 "geocoded", "city_approximation")
     ) %>%
     select(-geocode_query, -in_malaysia)
-
 } else {
-  cat("No API key; skipping geocoding for curated facilities\n")
   curated_facilities <- curated_facilities %>%
     mutate(lat = NA_real_, lon = NA_real_,
            coord_confidence = "not_geocoded") %>%
     select(-geocode_query)
 }
 
+# Apply campus offsets for multi-building sites that geocode to the same point
+# Convention: +0.001 lat per building (~111m) to prevent dedup collapse
+offset_rules <- tribble(
+  ~name_pattern,               ~lat_offset, ~lon_offset,
+  "GDS Nusajaya NTP2",         0.001,       0.0,
+  "GDS Nusajaya NTP3",         0.002,       0.0,
+  "YTL Johor Data Center 2",   0.001,       0.0,
+  "YTL Johor Data Center 3",   0.002,       0.0
+)
+
+for (i in seq_len(nrow(offset_rules))) {
+  idx <- which(str_detect(curated_facilities$name, offset_rules$name_pattern[i]))
+  if (length(idx) > 0) {
+    curated_facilities$lat[idx] <- curated_facilities$lat[idx] + offset_rules$lat_offset[i]
+    curated_facilities$lon[idx] <- curated_facilities$lon[idx] + offset_rules$lon_offset[i]
+    curated_facilities$coord_confidence[idx] <- "geocoded_with_campus_offset"
+  }
+}
+
+# Apply manual coordinate override for Keppel DC Johor 1
+# XLSX-verified location differs from geocoder result by ~22km
+keppel_idx <- which(curated_facilities$name == "Keppel DC Johor 1 (Kulai)")
+if (length(keppel_idx) > 0) {
+  curated_facilities$lat[keppel_idx] <- 1.6686
+  curated_facilities$lon[keppel_idx] <- 103.5224
+  curated_facilities$coord_confidence[keppel_idx] <- "manual_correction"
+}
+
 cat("Curated facilities:", nrow(curated_facilities), "\n")
-kable(curated_facilities %>% select(name, operator, status),
-      caption = "Manually curated facilities from public sources")
+cat("Geocoded:", sum(curated_facilities$coord_confidence == "geocoded", na.rm = TRUE), "\n")
+cat("Campus offset:", sum(curated_facilities$coord_confidence == "geocoded_with_campus_offset", na.rm = TRUE), "\n")
+cat("Manual correction:", sum(curated_facilities$coord_confidence == "manual_correction", na.rm = TRUE), "\n")
+
+kable(curated_facilities %>% select(name, operator, status, coord_confidence),
+      caption = "Manually curated facilities from public sources (audit-corrected)")
 ```
 
 ## Merge curated facilities into the dataset
@@ -2194,4 +2236,257 @@ summary_v5 <- final_v5 %>%
 
 kable(summary_v5,
       caption = "Final v5 dataset summary")
+```
+
+
+# Part 12: PeeringDB Facility API
+
+PeeringDB is a freely available, community-maintained database of
+interconnection facilities, internet exchange points, and networks. Unlike
+the other sources in this pipeline, PeeringDB captures the network
+infrastructure layer: facilities appear because network operators register
+their presence there for peering purposes. This means it surfaces carrier
+hotels and smaller colocation sites that don't appear in trade press or
+operator marketing pages, because their value proposition is connectivity
+rather than capacity. The API is a public REST endpoint that returns JSON
+with no authentication required for read-only queries.
+
+## Query PeeringDB for Malaysian facilities
+
+```{r}
+#| label: peeringdb-query
+
+pdb_url <- "https://www.peeringdb.com/api/fac?country=MY"
+
+pdb_resp <- tryCatch(
+  GET(
+    pdb_url,
+    add_headers(
+      `User-Agent` = "ITEC724-DatacenterPilot/1.0 (academic research)",
+      `Accept` = "application/json"
+    ),
+    timeout(30)
+  ),
+  error = function(e) {
+    cat("PeeringDB request error:", conditionMessage(e), "\n")
+    NULL
+  }
+)
+
+if (!is.null(pdb_resp) && status_code(pdb_resp) == 200) {
+  pdb_raw <- content(pdb_resp, as = "text", encoding = "UTF-8")
+  pdb_parsed <- fromJSON(pdb_raw, flatten = TRUE)
+  
+  pdb_facilities <- pdb_parsed$data %>%
+    as_tibble() %>%
+    filter(!is.na(latitude), !is.na(longitude))
+  
+  cat("PeeringDB returned", nrow(pdb_facilities), "facilities in Malaysia\n")
+} else {
+  cat("PeeringDB request failed; status:",
+      ifelse(!is.null(pdb_resp), status_code(pdb_resp), "no response"), "\n")
+  pdb_facilities <- tibble()
+}
+```
+
+## Parse and normalize PeeringDB data
+
+PeeringDB facility records include name, address, city, coordinates, and
+a website field. I normalized these into the same schema used by the rest
+of the pipeline, with source attribution set to "PeeringDB" and
+`coord_confidence` set to "source_native" since PeeringDB coordinates are
+entered by facility operators and are typically building-level accurate.
+
+```{r}
+#| label: peeringdb-parse
+
+if (nrow(pdb_facilities) > 0) {
+  
+  pdb_df <- pdb_facilities %>%
+    transmute(
+      name            = name,
+      operator        = org_name,
+      lat             = latitude,
+      lon             = longitude,
+      address         = paste(address1, city, state, zipcode, sep = ", "),
+      source          = "PeeringDB",
+      peeringdb_id    = as.character(id),
+      facility_type   = "physical_facility",
+      coord_confidence = "source_native",
+      status          = ifelse(status == "ok", "Operational", status),
+      note            = paste0("PeeringDB fac ID: ", id,
+                               ifelse(!is.na(website), paste0("; ", website), ""))
+    )
+  
+  cat("Parsed", nrow(pdb_df), "PeeringDB facilities\n\n")
+  kable(pdb_df %>% select(name, operator, address),
+        caption = "PeeringDB facilities in Malaysia")
+  
+} else {
+  pdb_df <- tibble()
+  cat("No PeeringDB data to parse\n")
+}
+```
+
+## Cross-reference against existing dataset and merge
+
+I cross-referenced PeeringDB facilities against the existing v5 dataset
+by name similarity and spatial proximity to identify genuinely new
+facilities versus those already captured from other sources. A facility
+was considered a match if its name appeared as a substring in an existing
+entry (case-insensitive) or if its coordinates were within 500 meters of
+an existing entry. Matched facilities were logged but not added;
+unmatched facilities were appended as net-new entries.
+
+```{r}
+#| label: peeringdb-merge
+
+if (nrow(pdb_df) > 0) {
+  
+  existing_names <- tolower(final_v5$name_normalized)
+  existing_coords <- final_v5 %>%
+    filter(!is.na(lat), !is.na(lon)) %>%
+    select(lat, lon)
+  
+  haversine_km <- function(lat1, lon1, lat2, lon2) {
+    R <- 6371
+    dlat <- (lat2 - lat1) * pi / 180
+    dlon <- (lon2 - lon1) * pi / 180
+    a <- sin(dlat/2)^2 + cos(lat1*pi/180) * cos(lat2*pi/180) * sin(dlon/2)^2
+    2 * R * asin(sqrt(a))
+  }
+  
+  pdb_df <- pdb_df %>%
+    mutate(
+      name_match = map_lgl(tolower(name), function(n) {
+        any(str_detect(existing_names, fixed(n)) |
+            str_detect(n, existing_names))
+      }),
+      spatial_match = map2_lgl(lat, lon, function(lt, ln) {
+        if (nrow(existing_coords) == 0) return(FALSE)
+        dists <- haversine_km(lt, ln,
+                              existing_coords$lat, existing_coords$lon)
+        any(dists < 0.5, na.rm = TRUE)
+      }),
+      is_new = !name_match & !spatial_match
+    )
+  
+  cat("PeeringDB cross-reference results:\n")
+  cat("  Name matches:", sum(pdb_df$name_match), "\n")
+  cat("  Spatial matches (<500m):", sum(pdb_df$spatial_match & !pdb_df$name_match), "\n")
+  cat("  Net new facilities:", sum(pdb_df$is_new), "\n\n")
+  
+  if (sum(pdb_df$is_new) > 0) {
+    new_pdb <- pdb_df %>%
+      filter(is_new) %>%
+      select(-name_match, -spatial_match, -is_new)
+    
+    kable(new_pdb %>% select(name, operator, address),
+          caption = "Net-new facilities from PeeringDB")
+    
+    pdb_slim <- new_pdb %>%
+      mutate(
+        osm_id          = NA_character_,
+        osm_type        = NA_character_,
+        wikidata_id     = NA_character_,
+        provider        = NA_character_,
+        region_code     = NA_character_,
+        sources         = source,
+        n_sources       = 1L,
+        ADMIN           = "Malaysia",
+        ISO_A3          = "MYS",
+        CONTINENT       = "Asia",
+        SUBREGION       = "South-Eastern Asia",
+        name_normalized = name,
+        has_operator    = TRUE,
+        in_both_sources = FALSE,
+        source_category = "PeeringDB",
+        operator_norm   = operator,
+        year            = NA_integer_,
+        cluster_id      = NA_character_
+      )
+    
+    all_cols <- union(names(final_v5), names(pdb_slim))
+    for (col in setdiff(all_cols, names(final_v5))) {
+      final_v5[[col]] <- NA
+    }
+    for (col in setdiff(all_cols, names(pdb_slim))) {
+      pdb_slim[[col]] <- NA
+    }
+    
+    common_cols <- intersect(names(final_v5), names(pdb_slim))
+    pdb_slim <- pdb_slim %>% select(all_of(common_cols))
+    final_v5 <- final_v5 %>% select(all_of(common_cols))
+    
+    final_v5 <- bind_rows(final_v5, pdb_slim)
+    
+    cat("Added", nrow(pdb_slim), "net-new PeeringDB facilities\n")
+    cat("Updated v5 total:", nrow(final_v5), "\n")
+  } else {
+    cat("All PeeringDB facilities already in dataset\n")
+  }
+  
+} else {
+  cat("No PeeringDB data to merge\n")
+}
+```
+
+## Updated coverage summary
+
+```{r}
+#| label: coverage-final
+
+category_final <- final_v5 %>%
+  count(source_category, name = "n_facilities") %>%
+  arrange(desc(n_facilities))
+
+kable(category_final,
+      caption = "Final dataset by source category (with PeeringDB)")
+
+ggplot(category_final,
+       aes(x = reorder(source_category, n_facilities), y = n_facilities,
+           fill = source_category)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  scale_fill_manual(values = c(
+    "Hyperscale Cloud"  = "red",
+    "OSM Only"          = "steelblue",
+    "OSM + Wikidata"    = "darkgreen",
+    "Trade Press"       = "orange",
+    "Manual Curation"   = "darkviolet",
+    "PeeringDB"         = "cyan4",
+    "Wikidata Only"     = "purple"
+  )) +
+  labs(
+    title    = "Datacenter facility coverage by source category",
+    subtitle = "Malaysia (final: all source layers)",
+    x        = "Source category",
+    y        = "Number of facilities"
+  ) +
+  theme_minimal()
+```
+
+## Final export
+
+```{r}
+#| label: export-final
+
+write.csv(final_v5,
+          file = "outputs/malaysia_datacenters_final.csv",
+          row.names = FALSE)
+saveRDS(final_v5, file = "outputs/malaysia_datacenters_final.rds")
+
+cat("Wrote", nrow(final_v5), "rows to outputs/malaysia_datacenters_final.csv\n")
+
+summary_final <- final_v5 %>%
+  group_by(source_category, facility_type) %>%
+  summarise(
+    n_facilities  = n(),
+    with_operator = sum(!is.na(operator), na.rm = TRUE),
+    operational   = sum(status == "Operational", na.rm = TRUE),
+    .groups = "drop"
+  )
+
+kable(summary_final,
+      caption = "Final dataset summary")
 ```
